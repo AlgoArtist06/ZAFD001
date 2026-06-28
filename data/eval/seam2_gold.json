@@ -99,6 +99,14 @@
       "language": "en",
       "mode": "professional",
       "expect_refusal": true
+    },
+    {
+      "id": "ipc-420-to-bns-318-en",
+      "query": "What is the punishment under IPC 420?",
+      "language": "en",
+      "mode": "citizen",
+      "expected_act_id": "bns",
+      "expected_section": "318"
     }
   ]
 }

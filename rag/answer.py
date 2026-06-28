@@ -11,9 +11,11 @@ answer for that") rather than a guess.
 """
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from typing import List, Optional, Sequence
 
+from ingestion.mapping import IpcBnsMapping, MappingEntry, load_ipc_bns_mapping
 from ingestion.models import Chunk
 from ingestion.vectorstore import Embedder
 from rag.citation import Citation
@@ -28,10 +30,32 @@ from rag.guardrails import (
     screen_request,
     soften_advice,
 )
+from rag.recognition import recognize_ipc
 from rag.retrieval import HybridRetriever, expand_query
 from rag.verifier import verify_citations
 
 REFUSAL_TEXT = "I do not have a sourced answer for that"
+
+_DEFAULT_MAPPING_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "data", "ipc_bns_mapping.json"
+)
+
+
+def _former_ipc_note(references: Sequence[MappingEntry]) -> str:
+    """A courtesy annotation of the repealed IPC numbers a query referenced.
+
+    The note names the former IPC number (e.g. "formerly IPC 420") so a user who
+    only knows the old number recognises the answer, while the answer itself
+    stays grounded in - and cites only - the current BNS section.
+    """
+    if not references:
+        return ""
+    parts = [f"formerly IPC {r.ipc} ({r.label})" for r in references]
+    return (
+        "Note: " + "; ".join(parts) + ". This is now covered by the current "
+        "BNS section cited above; the former IPC number is given only for "
+        "recognition and is not itself a source."
+    )
 
 # The two answering profiles over the single shared corpus. Citizen is the
 # default for new users; Professional is opted into when a Conversation starts.
@@ -56,6 +80,7 @@ class GroundedAnswer:
     refused: bool = False
     high_stakes: bool = False
     high_stakes_notice: str = ""
+    former_ipc_note: str = ""
     disclaimer: str = _DISCLAIMER
 
     @property
@@ -71,6 +96,8 @@ class GroundedAnswer:
         parts.append(self.explanation)
         if self.legal_basis:
             parts.append(self.legal_basis)
+        if self.former_ipc_note:
+            parts.append(self.former_ipc_note)
         if self.next_step:
             parts.append(self.next_step)
         if self.disclaimer:
@@ -86,11 +113,15 @@ class LegalAssistant:
         chunks: Sequence[Chunk],
         embedder: Embedder | None = None,
         generator: Optional[Generator] = None,
+        mapping: Optional[IpcBnsMapping] = None,
     ):
         # No provenance, no answer: only loadable chunks enter the index.
         self._corpus = [c for c in chunks if c.is_loadable()]
         self._retriever = HybridRetriever(self._corpus, embedder=embedder)
         self._generator = generator or DeterministicGenerator()
+        # The IPC-to-BNS Mapping normalises old IPC numbers on input and
+        # annotates them on output; it is never added to the retrieval corpus.
+        self._mapping = mapping or load_ipc_bns_mapping(_DEFAULT_MAPPING_PATH)
 
     def answer(
         self, query: str, mode: str = "citizen", language: str = "en"
@@ -101,9 +132,13 @@ class LegalAssistant:
         if screen.kind is RequestKind.ADVICE:
             return self._refuse_advice(query, mode, language)
 
+        # Recognise repealed IPC numbers and normalise them to the current BNS
+        # section before retrieval; carry the former number forward to annotate.
+        recognized = recognize_ipc(query, self._mapping)
+
         # Mode shapes the query, not the corpus: Citizen Mode expands lay
         # phrasing toward legal concepts, Professional Mode matches exactly.
-        retrieval_query = expand_query(query, mode)
+        retrieval_query = expand_query(recognized.query, mode)
         domains = route_domains(retrieval_query)
         hits = self._retriever.retrieve(retrieval_query, domains)
         grounded = [h for h in hits if h.keyword_score > 0]
@@ -129,6 +164,7 @@ class LegalAssistant:
             refused=False,
             high_stakes=screen.high_stakes,
             high_stakes_notice=notice,
+            former_ipc_note=_former_ipc_note(recognized.references),
         )
 
     def start_conversation(self, mode: str = CITIZEN) -> "Conversation":

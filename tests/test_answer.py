@@ -52,6 +52,32 @@ def test_citation_anchor_is_shown_verbatim_in_english(corpus):
     assert citation.verbatim_text in result.text
 
 
+def test_old_ipc_number_is_normalised_and_grounded_in_current_bns(corpus):
+    # A user who only knows the repealed IPC number still gets the BNS answer.
+    result = LegalAssistant(corpus).answer(
+        "What is the punishment under IPC 420?", "citizen", "en"
+    )
+    assert result.refused is False
+    # Grounded in the current BNS section (318), not the repealed IPC number.
+    assert any(c.act_id == "bns" and c.section_number == "318" for c in result.citations)
+
+
+def test_old_ipc_number_is_annotated_but_never_cited_as_a_source(corpus):
+    result = LegalAssistant(corpus).answer(
+        "What is the punishment under IPC 420?", "citizen", "en"
+    )
+    # The former IPC number is annotated as a courtesy...
+    assert "formerly IPC 420" in result.text
+    # ...but no Citation is ever the repealed IPC number.
+    assert all(c.act_id == "bns" for c in result.citations)
+    assert all(c.section_number != "420" for c in result.citations)
+
+
+def test_query_without_an_ipc_reference_carries_no_annotation(corpus):
+    result = LegalAssistant(corpus).answer("theft of property", "citizen", "en")
+    assert "formerly IPC" not in result.text
+
+
 def test_answer_uses_the_structured_format(corpus):
     result = LegalAssistant(corpus).answer("theft of property", "citizen", "en")
     text = result.text

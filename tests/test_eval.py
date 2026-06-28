@@ -44,6 +44,15 @@ def test_professional_gold_subset_every_case_holds(corpus):
     assert report.failures == []
 
 
+def test_old_ipc_number_gold_case_resolves_to_current_bns(corpus):
+    """An old-IPC-number query is a gold case: it must cite the current BNS
+    section, proving the IPC-to-BNS normalisation holds end to end."""
+    cases = [c for c in load_gold_cases(language=ENGLISH) if "ipc" in c.query.lower()]
+    assert cases, "expected a gold case covering an old IPC number"
+    report = run_gold_eval(LegalAssistant(corpus), cases)
+    assert report.failures == []
+
+
 def test_gold_eval_catches_a_wrong_section(corpus):
     """A harness that cannot fail proves nothing: a case expecting the wrong
     section must be reported as a failure, not a pass."""
