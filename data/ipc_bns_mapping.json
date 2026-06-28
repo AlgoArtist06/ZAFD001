@@ -1,0 +1,20 @@
+{
+  "description": "IPC-to-BNS Mapping. A structured lookup that relates a repealed IPC section number to its current BNS equivalent. Used only to recognise old numbers on input and to annotate answers; NEVER a Source of Truth and never embedded into the vector store. Sourced from the official correspondence chart.",
+  "source": "Official IPC-BNS correspondence chart (Ministry of Home Affairs)",
+  "entries": [
+    {"ipc": "302", "bns": "103", "label": "Murder"},
+    {"ipc": "303", "bns": "104", "label": "Murder by life-convict"},
+    {"ipc": "304B", "bns": "80", "label": "Dowry death"},
+    {"ipc": "307", "bns": "109", "label": "Attempt to murder"},
+    {"ipc": "323", "bns": "115", "label": "Voluntarily causing hurt"},
+    {"ipc": "354", "bns": "74", "label": "Assault on woman with intent to outrage modesty"},
+    {"ipc": "375", "bns": "63", "label": "Rape (definition)"},
+    {"ipc": "376", "bns": "64", "label": "Punishment for rape"},
+    {"ipc": "378", "bns": "303", "label": "Theft (definition)"},
+    {"ipc": "379", "bns": "303", "label": "Punishment for theft"},
+    {"ipc": "392", "bns": "309", "label": "Robbery"},
+    {"ipc": "420", "bns": "318", "label": "Cheating and dishonestly inducing delivery of property"},
+    {"ipc": "499", "bns": "356", "label": "Defamation"},
+    {"ipc": "120B", "bns": "61", "label": "Criminal conspiracy"}
+  ]
+}

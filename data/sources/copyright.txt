@@ -1,0 +1,33 @@
+ACT_ID: copyright
+ACT: Copyright Act
+YEAR: 1957
+TYPE: ip
+SOURCE_URL: https://www.indiacode.nic.in/handle/123456789/1367
+RETRIEVAL_DATE: 2026-06-28
+===
+Section 13. Works in which copyright subsists.
+(1) Subject to the provisions of this section and the other provisions of this
+Act, copyright shall subsist throughout India in original literary, dramatic,
+musical and artistic works, in cinematograph films, and in sound recording.
+
+Section 14. Meaning of copyright.
+For the purposes of this Act, "copyright" means the exclusive right subject to
+the provisions of this Act, to do or authorise the doing of any of the acts in
+respect of a work or any substantial part thereof, including to reproduce the
+work, to issue copies of the work to the public, and to communicate the work to
+the public.
+
+Section 17. First owner of copyright.
+Subject to the provisions of this Act, the author of a work shall be the first
+owner of the copyright therein.
+
+Section 51. When copyright infringed.
+Copyright in a work shall be deemed to be infringed when any person, without a
+licence granted by the owner of the copyright, does anything the exclusive right
+to do which is by this Act conferred upon the owner of the copyright.
+
+Section 57. Author's special rights.
+Independently of the author's copyright, and even after the assignment of the
+copyright, the author of a work shall have the right to claim authorship of the
+work and to restrain or claim damages in respect of any distortion or
+mutilation of the work which would be prejudicial to his honour or reputation.

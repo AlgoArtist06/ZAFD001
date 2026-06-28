@@ -1,0 +1,11 @@
+{
+  "_note": "Ground truth pinned from the official IPC-BNS correspondence chart. Content-accuracy tests grade the loaded mapping against these values, which the agent did not generate from the corpus.",
+  "pairs": {
+    "302": "103",
+    "304B": "80",
+    "376": "64",
+    "379": "303",
+    "420": "318",
+    "120B": "61"
+  }
+}

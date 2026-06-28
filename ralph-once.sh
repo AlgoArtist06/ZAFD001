@@ -3,7 +3,21 @@ set -euo pipefail
 
 #########################################
 # Ralph Loop (one issue only)
+#
+# Issues live as local markdown files in this repo's tracker:
+#   .scratch/<feature-slug>/issues/<NN>-<slug>.md
+# Each carries a `Status:` line (see docs/agents/triage-labels.md).
+# This script picks the next `ready-for-agent` issue, implements it,
+# and marks it `done`. No GitHub issues, no `gh`/`jq` required.
+#
+# Exit codes:
+#   0  one issue implemented and committed
+#   2  no `ready-for-agent` issues remain (loop should stop)
+#   1  error (dirty tree, missing config, no commit, ...)
 #########################################
+
+READY_STATUS="ready-for-agent"
+DONE_STATUS="done"
 
 # -----------------------------
 # Ensure git repository exists
@@ -48,49 +62,62 @@ fi
 OLD_COMMIT=$(git rev-parse HEAD)
 
 # -----------------------------
-# Fetch next GitHub issue
+# Fetch next local issue
+#
+# Lowest-numbered `ready-for-agent` issue across all feature slugs.
+# We only consider files under an `issues/` directory so the PRD
+# (which may also be marked ready) is never picked up.
 # -----------------------------
-ISSUE=$(gh issue list \
-    --state open \
-    --limit 1 \
-    --json number,title,body \
-    | jq '.[0]')
+ISSUE_FILE=""
+while IFS= read -r f; do
+    if grep -qiE "^Status:[[:space:]]*${READY_STATUS}[[:space:]]*$" "$f"; then
+        ISSUE_FILE="$f"
+        break
+    fi
+done < <(find .scratch -type f -path '*/issues/*.md' | sort)
 
-if [ "$ISSUE" = "null" ]; then
-    echo "No open GitHub issues."
-    exit 0
+if [ -z "$ISSUE_FILE" ]; then
+    echo "No '${READY_STATUS}' issues remain in .scratch/."
+    exit 2
 fi
 
-NUMBER=$(echo "$ISSUE" | jq -r '.number')
-TITLE=$(echo "$ISSUE" | jq -r '.title')
-BODY=$(echo "$ISSUE" | jq -r '.body')
+TITLE=$(grep -m1 '^# ' "$ISSUE_FILE" | sed 's/^# //')
+BODY=$(cat "$ISSUE_FILE")
+STATUS_LABEL=$(grep -m1 -iE '^Status:' "$ISSUE_FILE" | sed -E 's/^Status:[[:space:]]*//I')
 
 echo
 echo "======================================"
-echo "Implementing Issue #$NUMBER"
+echo "Implementing $ISSUE_FILE"
 echo "$TITLE"
+echo "Triage label: ${STATUS_LABEL}"
 echo "======================================"
 echo
 
 PROMPT=$(cat <<EOF
-Implement GitHub Issue #$NUMBER.
+Implement the local issue tracked in this repository at:
+  $ISSUE_FILE
 
 Title:
 $TITLE
 
-Description:
+Full issue file:
+---
 $BODY
+---
 
 Requirements:
 
 - Immediately invoke /tdd.
 - Work ONLY on this issue.
-- Follow Red → Green → Refactor.
+- Follow Red -> Green -> Refactor.
 - Keep implementation minimal.
-- Do not modify unrelated files.
+- Do not modify unrelated files or other issue files.
+- Satisfy the issue's acceptance criteria.
 - Run all project tests.
-- Run lint.
-- Run typecheck.
+- Run lint (if configured).
+- Run typecheck (if configured).
+- Update the issue file's "Status:" line to "${DONE_STATUS}".
+- Append a short "## Comments" note to the issue file summarizing what you built.
 - Stage all modified files.
 - Create ONE conventional git commit.
 - Do NOT begin another issue.
@@ -101,7 +128,7 @@ EOF
 # -----------------------------
 # Launch Claude
 # -----------------------------
-claude "$PROMPT"
+claude -p --dangerously-skip-permissions "$PROMPT"
 
 # -----------------------------
 # Verify Claude committed
@@ -114,31 +141,34 @@ if [ "$OLD_COMMIT" = "$NEW_COMMIT" ]; then
     exit 1
 fi
 
+# -----------------------------
+# Ensure the issue is marked done (fallback if Claude forgot).
+# Guarantees the loop makes progress and never re-picks this issue.
+# -----------------------------
+if grep -qiE "^Status:[[:space:]]*${READY_STATUS}[[:space:]]*$" "$ISSUE_FILE"; then
+    echo
+    echo "Issue still marked '${READY_STATUS}'; marking '${DONE_STATUS}'."
+    sed -i.bak -E "s/^Status:[[:space:]]*${READY_STATUS}[[:space:]]*$/Status: ${DONE_STATUS}/I" "$ISSUE_FILE"
+    rm -f "${ISSUE_FILE}.bak"
+    git add "$ISSUE_FILE"
+    git commit -m "chore: mark $(basename "$ISSUE_FILE" .md) ${DONE_STATUS}"
+fi
+
 CURRENT_BRANCH=$(git branch --show-current)
 
 # -----------------------------
-# Ensure GitHub remote exists
+# Push to the existing remote (best effort).
+# We never create a remote automatically.
 # -----------------------------
-if ! git remote get-url origin >/dev/null 2>&1; then
-
-    REPO_NAME=$(basename "$PWD")
-
-    echo
-    echo "Creating private GitHub repository '$REPO_NAME'..."
-
-    gh repo create "$REPO_NAME" \
-        --private \
-        --source=. \
-        --remote=origin \
-        --push
-
-else
-
+if git remote get-url origin >/dev/null 2>&1; then
     echo
     echo "Pushing latest commit..."
-
-    git push --set-upstream origin "$CURRENT_BRANCH"
-
+    if ! git push --set-upstream origin "$CURRENT_BRANCH"; then
+        echo "Push failed (continuing; commit is saved locally)."
+    fi
+else
+    echo
+    echo "No 'origin' remote configured; skipping push."
 fi
 
 echo
@@ -146,10 +176,12 @@ echo "======================================"
 echo "Ralph iteration complete!"
 echo "======================================"
 
+FINAL_LABEL=$(grep -m1 -iE '^Status:' "$ISSUE_FILE" | sed -E 's/^Status:[[:space:]]*//I')
+
+echo
+echo "Issue: $ISSUE_FILE"
+echo "Triage label: ${STATUS_LABEL} -> ${FINAL_LABEL}"
+
 echo
 echo "Latest commit:"
 git --no-pager log --oneline -1
-
-echo
-echo "GitHub:"
-gh repo view --web

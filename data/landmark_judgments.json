@@ -1,0 +1,45 @@
+{
+  "description": "Curated Landmark Judgment file. Hand-verified court precedents with full official citations. The model may cite a judgment only from this file and may never invent or generalise case law.",
+  "judgments": [
+    {
+      "id": "maneka-gandhi-1978",
+      "case_name": "Maneka Gandhi v. Union of India",
+      "citation": "(1978) 1 SCC 248",
+      "year": 1978,
+      "court": "Supreme Court of India",
+      "official_url": "https://main.sci.gov.in/judgments",
+      "domain": "constitutional",
+      "holding": "Article 21 'procedure established by law' must be just, fair and reasonable."
+    },
+    {
+      "id": "ks-puttaswamy-2017",
+      "case_name": "K.S. Puttaswamy (Retd.) v. Union of India",
+      "citation": "(2017) 10 SCC 1",
+      "year": 2017,
+      "court": "Supreme Court of India",
+      "official_url": "https://main.sci.gov.in/judgments",
+      "domain": "constitutional",
+      "holding": "The right to privacy is a fundamental right under Article 21."
+    },
+    {
+      "id": "dk-basu-1997",
+      "case_name": "D.K. Basu v. State of West Bengal",
+      "citation": "(1997) 1 SCC 416",
+      "year": 1997,
+      "court": "Supreme Court of India",
+      "official_url": "https://main.sci.gov.in/judgments",
+      "domain": "criminal",
+      "holding": "Mandatory safeguards on arrest and detention to prevent custodial abuse."
+    },
+    {
+      "id": "vishaka-1997",
+      "case_name": "Vishaka v. State of Rajasthan",
+      "citation": "(1997) 6 SCC 241",
+      "year": 1997,
+      "court": "Supreme Court of India",
+      "official_url": "https://main.sci.gov.in/judgments",
+      "domain": "constitutional",
+      "holding": "Guidelines against sexual harassment of women at the workplace."
+    }
+  ]
+}

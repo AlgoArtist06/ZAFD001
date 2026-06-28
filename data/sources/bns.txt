@@ -1,0 +1,54 @@
+ACT_ID: bns
+ACT: Bharatiya Nyaya Sanhita
+YEAR: 2023
+TYPE: criminal
+SOURCE_URL: https://www.indiacode.nic.in/handle/123456789/20062
+RETRIEVAL_DATE: 2026-06-28
+===
+Section 2. Definitions.
+In this Sanhita, unless the context otherwise requires, "act" denotes as well a
+series of acts as a single act; "dishonestly" means doing anything with the
+intention of causing wrongful gain to one person or wrongful loss to another
+person.
+
+Section 103. Punishment for murder.
+(1) Whoever commits murder shall be punished with death or imprisonment for
+life, and shall also be liable to fine.
+(2) When a group of five or more persons acting in concert commits murder on the
+ground of race, caste or community, sex, place of birth, language, personal
+belief or any other similar ground, each member of such group shall be punished
+with death or with imprisonment for life, and shall also be liable to fine.
+
+Section 115. Voluntarily causing hurt.
+(1) Whoever does any act with the intention of thereby causing hurt to any
+person, or with the knowledge that he is likely thereby to cause hurt to any
+person, and does thereby cause hurt to any person, is said voluntarily to cause
+hurt.
+(2) Whoever, except in the case provided for by sub-section (1) of section 122,
+voluntarily causes hurt, shall be punished with imprisonment of either
+description for a term which may extend to one year, or with fine which may
+extend to ten thousand rupees, or with both.
+
+Section 303. Theft.
+Whoever, intending to take dishonestly any movable property out of the
+possession of any person without that person's consent, moves that property in
+order to such taking, is said to commit theft.
+
+Section 318. Cheating.
+(1) Whoever, by deceiving any person, fraudulently or dishonestly induces the
+person so deceived to deliver any property to any person, or to consent that any
+person shall retain any property, or intentionally induces the person so
+deceived to do or omit to do anything which he would not do or omit if he were
+not so deceived, and which act or omission causes or is likely to cause damage
+or harm to that person in body, mind, reputation or property, is said to cheat.
+(2) Whoever cheats shall be punished with imprisonment of either description for
+a term which may extend to three years, or with fine, or with both.
+(3) Whoever cheats with the knowledge that he is likely thereby to cause
+wrongful loss to a person whose interest in the transaction he was bound to
+protect shall be punished with imprisonment of either description for a term
+which may extend to five years, or with fine, or with both.
+(4) Whoever cheats and thereby dishonestly induces the person deceived to
+deliver any property to any person, or to make, alter or destroy the whole or
+any part of a valuable security, shall be punished with imprisonment of either
+description for a term which may extend to seven years, and shall also be liable
+to fine.
