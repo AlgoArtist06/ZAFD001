@@ -35,6 +35,7 @@ class GoldCase:
     expected_act_id: Optional[str] = None
     expected_section: Optional[str] = None
     expect_refusal: bool = False
+    expect_high_stakes: bool = False
 
 
 @dataclass
@@ -78,6 +79,7 @@ def load_gold_cases(
             expected_act_id=entry.get("expected_act_id"),
             expected_section=entry.get("expected_section"),
             expect_refusal=entry.get("expect_refusal", False),
+            expect_high_stakes=entry.get("expect_high_stakes", False),
         )
         for entry in raw["cases"]
     ]
@@ -88,6 +90,17 @@ def load_gold_cases(
 
 def _evaluate(case: GoldCase, assistant: LegalAssistant) -> CaseResult:
     result = assistant.answer(case.query, mode=case.mode, language=case.language)
+
+    if case.expect_high_stakes:
+        leads = result.high_stakes and result.text.index("112") < result.text.index(
+            result.explanation
+        )
+        detail = (
+            "led with emergency contacts as expected"
+            if leads
+            else "expected High-Stakes Routing leading with emergency contacts"
+        )
+        return CaseResult(case=case, passed=leads, detail=detail)
 
     if case.expect_refusal:
         passed = result.refused

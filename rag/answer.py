@@ -20,6 +20,14 @@ from rag.citation import Citation
 from rag.domain import route_domains
 from rag.expansion import expand
 from rag.generation import DeterministicGenerator, Generator, _DISCLAIMER
+from rag.guardrails import (
+    ADVICE_REFUSAL_NEXT_STEP,
+    ADVICE_REFUSAL_TEXT,
+    HIGH_STAKES_NOTICE,
+    RequestKind,
+    screen_request,
+    soften_advice,
+)
 from rag.retrieval import HybridRetriever
 from rag.verifier import verify_citations
 
@@ -41,12 +49,21 @@ class GroundedAnswer:
     next_step: str
     citations: List[Citation] = field(default_factory=list)
     refused: bool = False
+    high_stakes: bool = False
+    high_stakes_notice: str = ""
     disclaimer: str = _DISCLAIMER
 
     @property
     def text(self) -> str:
-        """The structured rendering: explanation, legal basis, next step."""
-        parts = [self.explanation]
+        """The structured rendering.
+
+        High-Stakes Routing leads with the emergency / legal-aid notice; the
+        explanation, legal basis, and next step follow, with the Disclaimer last.
+        """
+        parts: List[str] = []
+        if self.high_stakes_notice:
+            parts.append(self.high_stakes_notice)
+        parts.append(self.explanation)
         if self.legal_basis:
             parts.append(self.legal_basis)
         parts.append(self.next_step)
@@ -72,31 +89,47 @@ class LegalAssistant:
     def answer(
         self, query: str, mode: str = "citizen", language: str = "en"
     ) -> GroundedAnswer:
+        # Input-side scope contract first: refuse advice, flag High-Stakes.
+        screen = screen_request(query)
+        notice = HIGH_STAKES_NOTICE if screen.high_stakes else ""
+        if screen.kind is RequestKind.ADVICE:
+            return self._refuse_advice(query, mode, language)
+
         domains = route_domains(query)
         hits = self._retriever.retrieve(query, domains)
         grounded = [h for h in hits if h.keyword_score > 0]
         if not grounded:
-            return self._refuse(query, mode, language)
+            return self._refuse(query, mode, language, screen.high_stakes, notice)
 
         sections = expand(grounded, self._corpus)
         draft = self._generator.generate(query, sections, mode, language)
         citations = verify_citations(draft.citations, sections)
         if not citations:
-            return self._refuse(query, mode, language)
+            return self._refuse(query, mode, language, screen.high_stakes, notice)
 
+        # Output-side check: soften any phrasing that slipped into advice.
         return GroundedAnswer(
             query=query,
             mode=mode,
             language=language,
-            explanation=draft.explanation,
-            legal_basis=draft.legal_basis,
-            next_step=draft.next_step,
+            explanation=soften_advice(draft.explanation),
+            legal_basis=soften_advice(draft.legal_basis),
+            next_step=soften_advice(draft.next_step),
             citations=citations,
             disclaimer=draft.disclaimer,
             refused=False,
+            high_stakes=screen.high_stakes,
+            high_stakes_notice=notice,
         )
 
-    def _refuse(self, query: str, mode: str, language: str) -> GroundedAnswer:
+    def _refuse(
+        self,
+        query: str,
+        mode: str,
+        language: str,
+        high_stakes: bool = False,
+        notice: str = "",
+    ) -> GroundedAnswer:
         return GroundedAnswer(
             query=query,
             mode=mode,
@@ -104,6 +137,23 @@ class LegalAssistant:
             explanation=REFUSAL_TEXT,
             legal_basis="",
             next_step=_REFUSAL_NEXT_STEP,
+            citations=[],
+            refused=True,
+            high_stakes=high_stakes,
+            high_stakes_notice=notice,
+        )
+
+    def _refuse_advice(
+        self, query: str, mode: str, language: str
+    ) -> GroundedAnswer:
+        """Refuse a request for Legal Advice and redirect to real help."""
+        return GroundedAnswer(
+            query=query,
+            mode=mode,
+            language=language,
+            explanation=ADVICE_REFUSAL_TEXT,
+            legal_basis="",
+            next_step=ADVICE_REFUSAL_NEXT_STEP,
             citations=[],
             refused=True,
         )

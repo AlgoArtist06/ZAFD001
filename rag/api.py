@@ -21,6 +21,8 @@ _STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 
 def _answer_parts(result: GroundedAnswer) -> Iterator[str]:
     """The structured answer, part by part, for progressive streaming."""
+    if result.high_stakes_notice:
+        yield result.high_stakes_notice + "\n\n"
     yield result.explanation + "\n\n"
     if result.legal_basis:
         yield result.legal_basis + "\n\n"
