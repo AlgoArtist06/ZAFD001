@@ -1,0 +1,33 @@
+# Minimal end-to-end Grounded Answer (English, Citizen Mode)
+
+Status: ready-for-agent
+
+## Parent
+
+PRD: `.scratch/legal-awareness-assistant/PRD.md`
+
+## What to build
+
+Implement the core answer seam, answer(query, mode, language), for the narrow path of English in Citizen Mode, end to end.
+Hybrid retrieval combines keyword and vector search and is filtered by Covered Domain.
+Retrieved chunks are expanded to their parent section and sibling sub-sections before generation, so the model always sees complete legal context.
+Generation is grounded: it answers only from retrieved Source of Truth text and attaches a Citation to every claim.
+A citation verifier rejects or strips any cited section that was not actually retrieved.
+The output uses the structured format: plain-language explanation, then legal basis with Citation, then practical next step.
+Expose the seam through a thin streaming API endpoint and a minimal chat UI with no authentication, so the path is demoable on its own.
+
+## Acceptance criteria
+
+- [ ] An answer(query, mode, language) entry returns the answer, its Citations, and a refused flag
+- [ ] Hybrid retrieval combines keyword and vector search, routed by Covered Domain
+- [ ] Retrieved chunks are expanded to parent section and siblings before generation
+- [ ] Every claim carries a Citation backed by a Provenance Record
+- [ ] The citation verifier rejects any section not present in the retrieved chunks
+- [ ] An unsupported query returns "I do not have a sourced answer for that" rather than a guess
+- [ ] The Citation Anchor is shown verbatim in English
+- [ ] A thin streaming endpoint and a minimal chat UI demo an English Citizen-mode question producing a Grounded Answer
+- [ ] The Seam 2 gold eval harness runs against the English subset
+
+## Blocked by
+
+- `01-ingestion-module-phase-0-gate.md`
