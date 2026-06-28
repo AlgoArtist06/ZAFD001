@@ -26,6 +26,24 @@ def test_gold_eval_runs_and_every_english_case_holds(corpus):
     assert report.passed == report.total
 
 
+def test_each_mode_has_a_non_empty_gold_subset():
+    citizen = load_gold_cases(mode="citizen")
+    professional = load_gold_cases(mode="professional")
+    assert citizen and professional
+    assert all(c.mode == "citizen" for c in citizen)
+    assert all(c.mode == "professional" for c in professional)
+    # Professional cases must cover both a cited-section case and a Refusal case.
+    assert any(c.expected_section for c in professional)
+    assert any(c.expect_refusal for c in professional)
+
+
+def test_professional_gold_subset_every_case_holds(corpus):
+    cases = load_gold_cases(mode="professional")
+    report = run_gold_eval(LegalAssistant(corpus), cases)
+    assert report.total == len(cases)
+    assert report.failures == []
+
+
 def test_gold_eval_catches_a_wrong_section(corpus):
     """A harness that cannot fail proves nothing: a case expecting the wrong
     section must be reported as a failure, not a pass."""

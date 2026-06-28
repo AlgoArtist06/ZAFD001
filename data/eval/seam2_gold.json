@@ -1,5 +1,5 @@
 {
-  "description": "Seam 2 gold evaluation set. Each case is hand-verified against the bare-act text: a supported query must cite the correct section; an out-of-scope or advice-seeking query must fire a Refusal. The English subset (language 'en') is the only one populated for issue 02; Hindi, Tamil, and Gujarati cases are added by the multilingual issues.",
+  "description": "Seam 2 gold evaluation set. Each case is hand-verified against the bare-act text: a supported query must cite the correct section; an out-of-scope or advice-seeking query must fire a Refusal. Cases carry a 'mode' (citizen or professional) and a 'language'; both Modes resolve against the same corpus. The English subset (language 'en') is populated here; Hindi, Tamil, and Gujarati cases are added by the multilingual issues.",
   "cases": [
     {
       "id": "bns-303-theft-en",
@@ -68,6 +68,37 @@
       "language": "en",
       "mode": "citizen",
       "expect_high_stakes": true
+    },
+    {
+      "id": "bns-303-theft-pro-en",
+      "query": "theft of movable property out of possession",
+      "language": "en",
+      "mode": "professional",
+      "expected_act_id": "bns",
+      "expected_section": "303"
+    },
+    {
+      "id": "bns-318-cheating-pro-en",
+      "query": "cheating by deceiving fraudulently dishonestly to deliver property",
+      "language": "en",
+      "mode": "professional",
+      "expected_act_id": "bns",
+      "expected_section": "318"
+    },
+    {
+      "id": "cpa-35-complaint-pro-en",
+      "query": "complaint filed with District Commission by consumer for goods sold",
+      "language": "en",
+      "mode": "professional",
+      "expected_act_id": "cpa",
+      "expected_section": "35"
+    },
+    {
+      "id": "refusal-out-of-scope-pro-en",
+      "query": "best recipe for biryani",
+      "language": "en",
+      "mode": "professional",
+      "expect_refusal": true
     }
   ]
 }

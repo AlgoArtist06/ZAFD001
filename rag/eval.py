@@ -65,9 +65,11 @@ class EvalReport:
 
 
 def load_gold_cases(
-    language: Optional[str] = None, path: str = _GOLD_PATH
+    language: Optional[str] = None,
+    path: str = _GOLD_PATH,
+    mode: Optional[str] = None,
 ) -> List[GoldCase]:
-    """Load the gold cases, optionally filtered to one language subset."""
+    """Load the gold cases, optionally filtered to one language and/or Mode."""
     with open(path, "r", encoding="utf-8") as handle:
         raw = json.load(handle)
     cases = [
@@ -85,6 +87,8 @@ def load_gold_cases(
     ]
     if language is not None:
         cases = [c for c in cases if c.language == language]
+    if mode is not None:
+        cases = [c for c in cases if c.mode == mode]
     return cases
 
 

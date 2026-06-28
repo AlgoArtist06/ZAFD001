@@ -28,10 +28,15 @@ from rag.guardrails import (
     screen_request,
     soften_advice,
 )
-from rag.retrieval import HybridRetriever
+from rag.retrieval import HybridRetriever, expand_query
 from rag.verifier import verify_citations
 
 REFUSAL_TEXT = "I do not have a sourced answer for that"
+
+# The two answering profiles over the single shared corpus. Citizen is the
+# default for new users; Professional is opted into when a Conversation starts.
+CITIZEN = "citizen"
+PROFESSIONAL = "professional"
 
 _REFUSAL_NEXT_STEP = (
     "For help, consider contacting a lawyer or your nearest Legal Services "
@@ -66,7 +71,8 @@ class GroundedAnswer:
         parts.append(self.explanation)
         if self.legal_basis:
             parts.append(self.legal_basis)
-        parts.append(self.next_step)
+        if self.next_step:
+            parts.append(self.next_step)
         if self.disclaimer:
             parts.append(self.disclaimer)
         return "\n\n".join(parts)
@@ -95,8 +101,11 @@ class LegalAssistant:
         if screen.kind is RequestKind.ADVICE:
             return self._refuse_advice(query, mode, language)
 
-        domains = route_domains(query)
-        hits = self._retriever.retrieve(query, domains)
+        # Mode shapes the query, not the corpus: Citizen Mode expands lay
+        # phrasing toward legal concepts, Professional Mode matches exactly.
+        retrieval_query = expand_query(query, mode)
+        domains = route_domains(retrieval_query)
+        hits = self._retriever.retrieve(retrieval_query, domains)
         grounded = [h for h in hits if h.keyword_score > 0]
         if not grounded:
             return self._refuse(query, mode, language, screen.high_stakes, notice)
@@ -121,6 +130,15 @@ class LegalAssistant:
             high_stakes=screen.high_stakes,
             high_stakes_notice=notice,
         )
+
+    def start_conversation(self, mode: str = CITIZEN) -> "Conversation":
+        """Open a Conversation whose Mode is fixed for its lifetime.
+
+        Default is Citizen Mode; pass ``mode="professional"`` for the
+        terse, citation-dense Professional profile. The chosen Mode cannot be
+        changed afterwards - switching Mode means a new Conversation.
+        """
+        return Conversation(self, mode)
 
     def _refuse(
         self,
@@ -159,9 +177,30 @@ class LegalAssistant:
         )
 
 
+class Conversation:
+    """A single chat with a Mode locked at start, over one shared assistant.
+
+    The Mode (Citizen or Professional) is chosen when the Conversation opens and
+    is read-only thereafter; every turn answers in that Mode against the
+    assistant's one corpus, retrieval index, and citation verifier.
+    """
+
+    def __init__(self, assistant: LegalAssistant, mode: str = CITIZEN):
+        self._assistant = assistant
+        self._mode = mode
+
+    @property
+    def mode(self) -> str:
+        return self._mode
+
+    def ask(self, query: str, language: str = "en") -> GroundedAnswer:
+        """Answer a turn in this Conversation's locked Mode."""
+        return self._assistant.answer(query, mode=self._mode, language=language)
+
+
 def answer(
     query: str,
-    mode: str = "citizen",
+    mode: str = CITIZEN,
     language: str = "en",
     *,
     assistant: LegalAssistant,

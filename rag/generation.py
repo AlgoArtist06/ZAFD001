@@ -49,12 +49,26 @@ class Generator(Protocol):
     ) -> DraftAnswer: ...
 
 
+PROFESSIONAL = "professional"
+
+
 class DeterministicGenerator:
-    """Template generator that only ever cites the sections it was handed."""
+    """Template generator that only ever cites the sections it was handed.
+
+    Both Modes draw on the same retrieved sections; they differ only in framing.
+    Citizen Mode answers in plain step-by-step language around a single focused
+    Citation; Professional Mode answers tersely and densely cites every grounded
+    section in statutory terms.
+    """
 
     def generate(
         self, query: str, sections: Sequence[RetrievedSection], mode: str, language: str
     ) -> DraftAnswer:
+        if mode == PROFESSIONAL:
+            return self._professional(sections)
+        return self._citizen(sections)
+
+    def _citizen(self, sections: Sequence[RetrievedSection]) -> DraftAnswer:
         top = sections[0]
         citation = Citation.from_section(top)
         domain_label = _DOMAIN_LABEL.get(top.provenance.act_type, "the law")
@@ -75,4 +89,15 @@ class DeterministicGenerator:
             legal_basis=legal_basis,
             next_step=next_step,
             citations=[citation],
+        )
+
+    def _professional(self, sections: Sequence[RetrievedSection]) -> DraftAnswer:
+        # Dense: cite every grounded section, in retrieval order, statutory terms.
+        citations = [Citation.from_section(s) for s in sections]
+        legal_basis = "\n".join(c.anchor for c in citations)
+        return DraftAnswer(
+            explanation="Applicable provisions:",
+            legal_basis=legal_basis,
+            next_step="",
+            citations=citations,
         )

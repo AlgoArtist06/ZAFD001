@@ -9,12 +9,45 @@ as unsupported (a Refusal) rather than a guess.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import List, Sequence
 
 from ingestion.models import ActType, Chunk
 from ingestion.vectorstore import DeterministicEmbedder, Embedder, _cosine
 from rag.text import content_stems
+
+PROFESSIONAL = "professional"
+
+# Citizen Mode complaint-to-concept normalization: lay words mapped to the
+# statutory term they describe. Injected into the query before retrieval so a
+# colloquial complaint still reaches the right section. Professional Mode skips
+# this entirely - it takes precise legal terms and matches them exactly.
+_LAY_CONCEPTS = {
+    "tricked": "cheating fraud",
+    "fooled": "cheating fraud",
+    "conned": "cheating fraud",
+    "duped": "cheating fraud",
+    "swindled": "cheating fraud",
+    "ripped": "cheating fraud",
+    "scammed": "cheating fraud",
+}
+
+_WORD_RE = re.compile(r"[a-z]+")
+
+
+def expand_query(query: str, mode: str) -> str:
+    """Prepare a query for retrieval according to its Mode.
+
+    Professional Mode returns the query unchanged (exact keyword, no expansion).
+    Citizen Mode appends the legal concept behind any lay complaint word it
+    recognises, so colloquial phrasing reaches the matching statutory section.
+    """
+    if mode == PROFESSIONAL:
+        return query
+    words = set(_WORD_RE.findall(query.lower()))
+    additions = [_LAY_CONCEPTS[w] for w in words if w in _LAY_CONCEPTS]
+    return query + " " + " ".join(additions) if additions else query
 
 
 @dataclass
