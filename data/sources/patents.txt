@@ -1,0 +1,32 @@
+ACT_ID: patents
+ACT: Patents Act
+YEAR: 1970
+TYPE: ip
+SOURCE_URL: https://www.indiacode.nic.in/handle/123456789/1392
+RETRIEVAL_DATE: 2026-06-28
+===
+Section 2. Definitions and interpretation.
+(1)(j) "invention" means a new product or process involving an inventive step
+and capable of industrial application.
+(1)(m) "patent" means a patent for any invention granted under this Act.
+
+Section 3. What are not inventions.
+The following are not inventions within the meaning of this Act, namely an
+invention which is frivolous or which claims anything obviously contrary to well
+established natural laws, and the mere discovery of a scientific principle or the
+formulation of an abstract theory.
+
+Section 6. Persons entitled to apply for patents.
+(1) An application for a patent for an invention may be made by any person
+claiming to be the true and first inventor of the invention, or by any person
+being the assignee of the person claiming to be the true and first inventor.
+
+Section 53. Term of patent.
+(1) Subject to the provisions of this Act, the term of every patent granted
+shall be twenty years from the date of filing of the application for the patent.
+
+Section 48. Rights of patentees.
+Subject to the other provisions contained in this Act, a patent granted under
+this Act shall confer upon the patentee the exclusive right to prevent third
+parties from making, using, offering for sale, selling or importing the patented
+product or process in India without his consent.

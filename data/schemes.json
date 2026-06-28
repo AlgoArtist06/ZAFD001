@@ -1,0 +1,24 @@
+{
+  "description": "Curated government scheme fact-cards. Structured facts (eligibility, documents, how to apply, official link), not parsed statute. Each carries scheme provenance: governing authority and official scheme URL in place of a section number.",
+  "retrieval_date": "2026-06-28",
+  "schemes": [
+    {
+      "id": "pmay",
+      "name": "Pradhan Mantri Awas Yojana",
+      "year": 2015,
+      "governing_authority": "Ministry of Housing and Urban Affairs",
+      "scheme_url": "https://pmaymis.gov.in",
+      "source_hash": "scheme-pmay-0000000000000000000000000000000000000000000000000000",
+      "facts": "Eligibility: EWS/LIG/MIG households without a pucca house. Documents: Aadhaar, income proof, bank details. How to apply: online at pmaymis.gov.in or at a Common Service Centre."
+    },
+    {
+      "id": "ayushman-bharat",
+      "name": "Ayushman Bharat - PM Jan Arogya Yojana",
+      "year": 2018,
+      "governing_authority": "National Health Authority",
+      "scheme_url": "https://pmjay.gov.in",
+      "source_hash": "scheme-pmjay-000000000000000000000000000000000000000000000000000",
+      "facts": "Eligibility: families identified in the SECC database. Benefit: health cover up to Rs 5 lakh per family per year. How to apply: verify eligibility at pmjay.gov.in or a listed hospital."
+    }
+  ]
+}

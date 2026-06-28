@@ -1,0 +1,43 @@
+ACT_ID: bnss
+ACT: Bharatiya Nagarik Suraksha Sanhita
+YEAR: 2023
+TYPE: criminal
+SOURCE_URL: https://www.indiacode.nic.in/handle/123456789/20063
+RETRIEVAL_DATE: 2026-06-28
+===
+Section 35. When police may arrest without warrant.
+(1) Any police officer may without an order from a Magistrate and without a
+warrant, arrest any person who commits, in the presence of a police officer, a
+cognizable offence, or against whom a reasonable complaint has been made or
+credible information has been received that he has committed a cognizable
+offence punishable with imprisonment for a term which may extend to seven years.
+(2) No person concerned in a cognizable offence punishable for a term less than
+three years and who is infirm or is above sixty years of age shall be arrested
+without the prior permission of an officer not below the rank of Deputy
+Superintendent of Police.
+
+Section 47. Person arrested to be informed of grounds of arrest and of right to
+bail.
+(1) Every police officer or other person arresting any person without warrant
+shall forthwith communicate to him full particulars of the offence for which he
+is arrested or other grounds for such arrest.
+(2) Where a police officer arrests without warrant any person other than a
+person accused of a non-bailable offence, he shall inform the person arrested
+that he is entitled to be released on bail and that he may arrange for sureties
+on his behalf.
+
+Section 173. Information in cognizable cases.
+Every information relating to the commission of a cognizable offence,
+irrespective of the area where the offence is committed, may be given orally or
+by electronic communication to an officer in charge of a police station, and if
+given orally, shall be reduced to writing by him or under his direction.
+
+Section 187. Procedure when investigation cannot be completed in twenty-four
+hours.
+Whenever any person is arrested and detained in custody and it appears that the
+investigation cannot be completed within the period of twenty-four hours, the
+officer in charge shall forward the accused to the nearest Judicial Magistrate.
+
+Section 196. Inquiry by Magistrate into cause of death.
+When any person dies while in the custody of the police, the nearest Magistrate
+empowered to hold inquests shall hold an inquiry into the cause of death.

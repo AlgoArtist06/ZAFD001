@@ -1,0 +1,38 @@
+ACT_ID: bsa
+ACT: Bharatiya Sakshya Adhiniyam
+YEAR: 2023
+TYPE: criminal
+SOURCE_URL: https://www.indiacode.nic.in/handle/123456789/20064
+RETRIEVAL_DATE: 2026-06-28
+===
+Section 3. Evidence may be given of facts in issue and relevant facts.
+Evidence may be given in any suit or proceeding of the existence or
+non-existence of every fact in issue and of such other facts as are hereinafter
+declared to be relevant, and of no others.
+
+Section 39. Opinions of experts.
+(1) When the Court has to form an opinion upon a point of foreign law or of
+science or art, or as to identity of handwriting or finger impressions, the
+opinions upon that point of persons specially skilled in such foreign law,
+science or art, or in questions as to identity of handwriting or finger
+impressions are relevant facts and such persons are called experts.
+(2) When in a proceeding the Court has to form an opinion on any matter relating
+to any information transmitted or stored in any computer resource or any other
+electronic or digital form, the opinion of the Examiner of Electronic Evidence
+is a relevant fact.
+
+Section 61. Electronic or digital record.
+Nothing in this Adhiniyam shall apply to deny the admissibility of an electronic
+or digital record in the evidence on the ground that it is an electronic or
+digital record and such record shall have the same legal effect, validity and
+enforceability as other documents.
+
+Section 105. Burden of proof.
+Whoever desires any Court to give judgment as to any legal right or liability
+dependent on the existence of facts which he asserts, must prove that those
+facts exist; and when a person is bound to prove the existence of any fact, it
+is said that the burden of proof lies on that person.
+
+Section 109. Burden of proving fact especially within knowledge.
+When any fact is especially within the knowledge of any person, the burden of
+proving that fact is upon him.

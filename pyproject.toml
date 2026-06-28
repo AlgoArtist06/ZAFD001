@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "legal-ingestion"
+version = "0.1.0"
+description = "Phase 0 ingestion module for the Multilingual Legal Awareness Assistant (ZABR-008)"
+requires-python = ">=3.9"
+dependencies = []
+
+[tool.setuptools]
+packages = ["ingestion"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.mypy]
+python_version = "3.9"
+ignore_missing_imports = true
+warn_unused_ignores = false
+disallow_untyped_defs = false
+exclude = "tests"

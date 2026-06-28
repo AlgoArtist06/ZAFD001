@@ -1,0 +1,33 @@
+ACT_ID: trademarks
+ACT: Trade Marks Act
+YEAR: 1999
+TYPE: ip
+SOURCE_URL: https://www.indiacode.nic.in/handle/123456789/1993
+RETRIEVAL_DATE: 2026-06-28
+===
+Section 9. Absolute grounds for refusal of registration.
+(1) The trade marks which are devoid of any distinctive character, that is to
+say, not capable of distinguishing the goods or services of one person from
+those of another person, shall not be registered.
+
+Section 18. Application for registration.
+(1) Any person claiming to be the proprietor of a trade mark used or proposed to
+be used by him, who is desirous of registering it, shall apply in writing to the
+Registrar in the prescribed manner for the registration of his trade mark.
+
+Section 28. Rights conferred by registration.
+(1) Subject to the other provisions of this Act, the registration of a trade
+mark shall, if valid, give to the registered proprietor of the trade mark the
+exclusive right to the use of the trade mark in relation to the goods or
+services in respect of which the trade mark is registered.
+
+Section 29. Infringement of registered trade marks.
+(1) A registered trade mark is infringed by a person who, not being a registered
+proprietor or a person using by way of permitted use, uses in the course of
+trade a mark which is identical with, or deceptively similar to, the trade mark
+in relation to goods or services in respect of which the trade mark is
+registered.
+
+Section 134. Suit for infringement to be instituted before District Court.
+No suit for the infringement of a registered trade mark shall be instituted in
+any court inferior to a District Court having jurisdiction to try the suit.
