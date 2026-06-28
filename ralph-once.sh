@@ -128,7 +128,7 @@ EOF
 # -----------------------------
 # Launch Claude
 # -----------------------------
-claude "$PROMPT"
+claude --dangerously-skip-permissions "$PROMPT"
 
 # -----------------------------
 # Verify Claude committed
