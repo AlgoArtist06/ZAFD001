@@ -47,7 +47,7 @@ while true; do
 
         2)
             echo
-            echo "No remaining GitHub issues."
+            echo "No remaining 'ready-for-agent' issues in .scratch/."
             echo "Ralph loop complete."
             exit 0
             ;;
