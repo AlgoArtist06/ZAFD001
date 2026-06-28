@@ -51,11 +51,19 @@ fi
 
 # -----------------------------
 # Working tree must be clean
+#
+# Use porcelain so UNTRACKED files also count as dirty. A killed Claude
+# session can leave new (uncommitted, untracked) source files behind;
+# `git diff` ignores those, which let leftover state silently leak into
+# the next iteration. Porcelain respects .gitignore, so build caches
+# (__pycache__, .pytest_cache, ...) are not flagged.
 # -----------------------------
-if ! git diff --quiet || ! git diff --cached --quiet; then
+if [ -n "$(git status --porcelain)" ]; then
     echo
-    echo "Working tree is dirty."
-    echo "Commit or stash your changes before running Ralph."
+    echo "Working tree is dirty (tracked or untracked changes):"
+    git status --short
+    echo
+    echo "Commit, stash, or clean these before running Ralph."
     exit 1
 fi
 
@@ -137,7 +145,14 @@ NEW_COMMIT=$(git rev-parse HEAD)
 
 if [ "$OLD_COMMIT" = "$NEW_COMMIT" ]; then
     echo
-    echo "Claude did not create a commit."
+    echo "Claude did not create a commit for:"
+    echo "  $ISSUE_FILE"
+    echo
+    echo "Any work it left behind is uncommitted and shown below."
+    echo "Inspect, then either commit it and mark the issue 'done', or"
+    echo "discard it (git checkout -- . ; git clean -fd) before re-running."
+    echo
+    git status --short
     exit 1
 fi
 
