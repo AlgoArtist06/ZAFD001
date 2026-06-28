@@ -107,6 +107,60 @@
       "mode": "citizen",
       "expected_act_id": "bns",
       "expected_section": "318"
+    },
+    {
+      "id": "bns-303-theft-hi",
+      "query": "चोरी की सजा क्या है?",
+      "language": "hi",
+      "mode": "citizen",
+      "expected_act_id": "bns",
+      "expected_section": "303"
+    },
+    {
+      "id": "bns-318-cheating-hi",
+      "query": "किसी ने मुझे धोखाधड़ी से ठगा और मेरी संपत्ति बेईमानी से ले ली",
+      "language": "hi",
+      "mode": "citizen",
+      "expected_act_id": "bns",
+      "expected_section": "318"
+    },
+    {
+      "id": "cpa-35-complaint-hi",
+      "query": "मुझे बेचे गए सामान के बारे में उपभोक्ता शिकायत कैसे दर्ज करूँ?",
+      "language": "hi",
+      "mode": "citizen",
+      "expected_act_id": "cpa",
+      "expected_section": "35"
+    },
+    {
+      "id": "constitution-21-liberty-hi",
+      "query": "मेरे जीवन और व्यक्तिगत स्वतंत्रता की रक्षा क्या करता है?",
+      "language": "hi",
+      "mode": "citizen",
+      "expected_act_id": "constitution",
+      "expected_section": "21"
+    },
+    {
+      "id": "copyright-51-infringed-hi",
+      "query": "किसी ने बिना लाइसेंस मेरा काम कॉपी किया, क्या मेरा कॉपीराइट उल्लंघन हुआ?",
+      "language": "hi",
+      "mode": "citizen",
+      "expected_act_id": "copyright",
+      "expected_section": "51"
+    },
+    {
+      "id": "refusal-out-of-scope-hi",
+      "query": "बिरयानी की सबसे अच्छी रेसिपी क्या है?",
+      "language": "hi",
+      "mode": "citizen",
+      "expect_refusal": true
+    },
+    {
+      "id": "confirmation-ambiguous-rights-hi",
+      "query": "मेरे अधिकार क्या हैं?",
+      "language": "hi",
+      "mode": "citizen",
+      "expect_confirmation": true
     }
   ]
 }

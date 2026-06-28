@@ -30,11 +30,22 @@ from rag.guardrails import (
     screen_request,
     soften_advice,
 )
+from rag.multilingual import (
+    HINDI,
+    BilingualGlossary,
+    confirmation_for,
+    normalize_query,
+)
 from rag.recognition import recognize_ipc
 from rag.retrieval import HybridRetriever, expand_query
 from rag.verifier import verify_citations
 
 REFUSAL_TEXT = "I do not have a sourced answer for that"
+
+# Refusal copy per Supported Language, so a Hindi user is refused in Hindi.
+_REFUSAL_TEXT_BY_LANGUAGE = {
+    HINDI: "मेरे पास इसका कोई स्रोत-समर्थित उत्तर नहीं है",
+}
 
 _DEFAULT_MAPPING_PATH = os.path.join(
     os.path.dirname(os.path.dirname(__file__)), "data", "ipc_bns_mapping.json"
@@ -67,6 +78,13 @@ _REFUSAL_NEXT_STEP = (
     "Authority (NALSA / DLSA)."
 )
 
+_REFUSAL_NEXT_STEP_BY_LANGUAGE = {
+    HINDI: (
+        "सहायता के लिए किसी वकील या अपने निकटतम विधिक सेवा प्राधिकरण "
+        "(NALSA / DLSA) से संपर्क करने पर विचार करें।"
+    ),
+}
+
 
 @dataclass
 class GroundedAnswer:
@@ -82,14 +100,19 @@ class GroundedAnswer:
     high_stakes_notice: str = ""
     former_ipc_note: str = ""
     disclaimer: str = _DISCLAIMER
+    needs_confirmation: bool = False
+    confirmation: str = ""
 
     @property
     def text(self) -> str:
         """The structured rendering.
 
+        A Confirmation Step short-circuits to just the clarifying question. Otherwise
         High-Stakes Routing leads with the emergency / legal-aid notice; the
         explanation, legal basis, and next step follow, with the Disclaimer last.
         """
+        if self.needs_confirmation:
+            return self.confirmation
         parts: List[str] = []
         if self.high_stakes_notice:
             parts.append(self.high_stakes_notice)
@@ -114,11 +137,16 @@ class LegalAssistant:
         embedder: Embedder | None = None,
         generator: Optional[Generator] = None,
         mapping: Optional[IpcBnsMapping] = None,
+        glossary: Optional[BilingualGlossary] = None,
     ):
         # No provenance, no answer: only loadable chunks enter the index.
         self._corpus = [c for c in chunks if c.is_loadable()]
         self._retriever = HybridRetriever(self._corpus, embedder=embedder)
-        self._generator = generator or DeterministicGenerator()
+        # The Bilingual Legal Glossary normalises an incoming query to English and
+        # constrains the terminology of the answer; the same instance backs the
+        # generator so both directions agree on terms.
+        self._glossary = glossary or BilingualGlossary.load()
+        self._generator = generator or DeterministicGenerator(self._glossary)
         # The IPC-to-BNS Mapping normalises old IPC numbers on input and
         # annotates them on output; it is never added to the retrieval corpus.
         self._mapping = mapping or load_ipc_bns_mapping(_DEFAULT_MAPPING_PATH)
@@ -126,15 +154,32 @@ class LegalAssistant:
     def answer(
         self, query: str, mode: str = "citizen", language: str = "en"
     ) -> GroundedAnswer:
+        # Multilingual layer: detect the user's language and extract the query's
+        # intent into English (legal terms preserved, code-mixing handled) so every
+        # downstream step - screening, recognition, retrieval, reasoning - runs over
+        # the single English Source of Truth. The answer is rendered back in the
+        # detected language; an explicit non-English language is honoured when the
+        # query carries no script of its own.
+        normalized = normalize_query(query, self._glossary)
+        out_language = normalized.language if normalized.language != "en" else language
+        english_query = normalized.english_query
+
+        # Confirmation Step: in Citizen Mode an ambiguous query is clarified before
+        # answering, never guessed at. Professional Mode takes queries as precise.
+        if mode != PROFESSIONAL:
+            confirmation = confirmation_for(english_query, out_language)
+            if confirmation is not None:
+                return self._confirm(query, mode, out_language, confirmation)
+
         # Input-side scope contract first: refuse advice, flag High-Stakes.
-        screen = screen_request(query)
+        screen = screen_request(english_query)
         notice = HIGH_STAKES_NOTICE if screen.high_stakes else ""
         if screen.kind is RequestKind.ADVICE:
-            return self._refuse_advice(query, mode, language)
+            return self._refuse_advice(query, mode, out_language)
 
         # Recognise repealed IPC numbers and normalise them to the current BNS
         # section before retrieval; carry the former number forward to annotate.
-        recognized = recognize_ipc(query, self._mapping)
+        recognized = recognize_ipc(english_query, self._mapping)
 
         # Mode shapes the query, not the corpus: Citizen Mode expands lay
         # phrasing toward legal concepts, Professional Mode matches exactly.
@@ -143,19 +188,19 @@ class LegalAssistant:
         hits = self._retriever.retrieve(retrieval_query, domains)
         grounded = [h for h in hits if h.keyword_score > 0]
         if not grounded:
-            return self._refuse(query, mode, language, screen.high_stakes, notice)
+            return self._refuse(query, mode, out_language, screen.high_stakes, notice)
 
         sections = expand(grounded, self._corpus)
-        draft = self._generator.generate(query, sections, mode, language)
+        draft = self._generator.generate(english_query, sections, mode, out_language)
         citations = verify_citations(draft.citations, sections)
         if not citations:
-            return self._refuse(query, mode, language, screen.high_stakes, notice)
+            return self._refuse(query, mode, out_language, screen.high_stakes, notice)
 
         # Output-side check: soften any phrasing that slipped into advice.
         return GroundedAnswer(
             query=query,
             mode=mode,
-            language=language,
+            language=out_language,
             explanation=soften_advice(draft.explanation),
             legal_basis=soften_advice(draft.legal_basis),
             next_step=soften_advice(draft.next_step),
@@ -188,13 +233,31 @@ class LegalAssistant:
             query=query,
             mode=mode,
             language=language,
-            explanation=REFUSAL_TEXT,
+            explanation=_REFUSAL_TEXT_BY_LANGUAGE.get(language, REFUSAL_TEXT),
             legal_basis="",
-            next_step=_REFUSAL_NEXT_STEP,
+            next_step=_REFUSAL_NEXT_STEP_BY_LANGUAGE.get(language, _REFUSAL_NEXT_STEP),
             citations=[],
             refused=True,
             high_stakes=high_stakes,
             high_stakes_notice=notice,
+        )
+
+    def _confirm(
+        self, query: str, mode: str, language: str, confirmation: str
+    ) -> GroundedAnswer:
+        """Pose a Confirmation Step instead of answering an ambiguous query."""
+        return GroundedAnswer(
+            query=query,
+            mode=mode,
+            language=language,
+            explanation=confirmation,
+            legal_basis="",
+            next_step="",
+            citations=[],
+            refused=False,
+            needs_confirmation=True,
+            confirmation=confirmation,
+            disclaimer="",
         )
 
     def _refuse_advice(

@@ -36,6 +36,7 @@ class GoldCase:
     expected_section: Optional[str] = None
     expect_refusal: bool = False
     expect_high_stakes: bool = False
+    expect_confirmation: bool = False
 
 
 @dataclass
@@ -82,6 +83,7 @@ def load_gold_cases(
             expected_section=entry.get("expected_section"),
             expect_refusal=entry.get("expect_refusal", False),
             expect_high_stakes=entry.get("expect_high_stakes", False),
+            expect_confirmation=entry.get("expect_confirmation", False),
         )
         for entry in raw["cases"]
     ]
@@ -105,6 +107,15 @@ def _evaluate(case: GoldCase, assistant: LegalAssistant) -> CaseResult:
             else "expected High-Stakes Routing leading with emergency contacts"
         )
         return CaseResult(case=case, passed=leads, detail=detail)
+
+    if case.expect_confirmation:
+        passed = result.needs_confirmation
+        detail = (
+            "posed a Confirmation Step as expected"
+            if passed
+            else "expected a Confirmation Step, got a direct answer"
+        )
+        return CaseResult(case=case, passed=passed, detail=detail)
 
     if case.expect_refusal:
         passed = result.refused

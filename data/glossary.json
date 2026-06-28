@@ -1,0 +1,32 @@
+{
+  "description": "The Bilingual Legal Glossary: the curated, hand-verified table of critical legal terms and their correct equivalents across the Supported Languages. It is the deterministic backbone that keeps terminology (for example bailable versus non-bailable) from drifting in translation - both when an incoming query is normalised to English and when an answer is rendered back into the user's language. Hindi rows are populated here; Tamil and Gujarati rows follow in their own issues.",
+  "terms": [
+    {"en": "theft", "hi": "चोरी"},
+    {"en": "punishment", "hi": "सजा"},
+    {"en": "movable property", "hi": "चल संपत्ति"},
+    {"en": "property", "hi": "संपत्ति"},
+    {"en": "cheating", "hi": "धोखाधड़ी"},
+    {"en": "fraud", "hi": "छल"},
+    {"en": "dishonestly", "hi": "बेईमानी"},
+    {"en": "consumer complaint", "hi": "उपभोक्ता शिकायत"},
+    {"en": "consumer", "hi": "उपभोक्ता"},
+    {"en": "complaint", "hi": "शिकायत"},
+    {"en": "goods", "hi": "सामान"},
+    {"en": "copyright", "hi": "कॉपीराइट"},
+    {"en": "infringed", "hi": "उल्लंघन"},
+    {"en": "licence", "hi": "लाइसेंस"},
+    {"en": "life", "hi": "जीवन"},
+    {"en": "personal liberty", "hi": "व्यक्तिगत स्वतंत्रता"},
+    {"en": "right", "hi": "अधिकार"},
+    {"en": "bailable", "hi": "जमानती"},
+    {"en": "non-bailable", "hi": "गैर-जमानती"},
+    {"en": "police", "hi": "पुलिस"}
+  ],
+  "domains": [
+    {"en": "criminal law", "hi": "आपराधिक कानून"},
+    {"en": "consumer protection law", "hi": "उपभोक्ता संरक्षण कानून"},
+    {"en": "intellectual property law", "hi": "बौद्धिक संपदा कानून"},
+    {"en": "your fundamental rights", "hi": "आपके मौलिक अधिकार"},
+    {"en": "government schemes", "hi": "सरकारी योजनाएँ"}
+  ]
+}
