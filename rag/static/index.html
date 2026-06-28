@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Legal Awareness Assistant - Demo (English, Citizen Mode)</title>
+    <style>
+      :root { color-scheme: light; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: #f5f6f8;
+        color: #1c1f23;
+      }
+      .shell { max-width: 720px; margin: 0 auto; padding: 32px 20px 64px; }
+      header h1 { font-size: 20px; margin: 0 0 4px; }
+      header p { margin: 0 0 24px; color: #5b6470; font-size: 14px; }
+      .answer {
+        white-space: pre-wrap;
+        background: #fff;
+        border: 1px solid #e3e6ea;
+        border-radius: 12px;
+        padding: 20px;
+        min-height: 96px;
+        line-height: 1.55;
+        font-size: 15px;
+      }
+      .answer:empty::before {
+        content: "Your sourced answer will appear here.";
+        color: #9aa3ad;
+      }
+      form { display: flex; gap: 8px; margin-top: 16px; }
+      textarea {
+        flex: 1;
+        resize: vertical;
+        min-height: 64px;
+        padding: 12px 14px;
+        border: 1px solid #cfd4da;
+        border-radius: 10px;
+        font: inherit;
+      }
+      button {
+        align-self: flex-end;
+        padding: 12px 18px;
+        border: 0;
+        border-radius: 10px;
+        background: #1a73e8;
+        color: #fff;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:disabled { opacity: 0.5; cursor: default; }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header>
+        <h1>Legal Awareness Assistant</h1>
+        <p>Demo path - English, Citizen Mode. Every answer is grounded in a cited government source.</p>
+      </header>
+
+      <div id="answer" class="answer" aria-live="polite"></div>
+
+      <form id="ask">
+        <textarea
+          id="query"
+          name="query"
+          placeholder="Ask about your rights, e.g. 'What is the punishment for theft of movable property?'"
+          required
+        ></textarea>
+        <button id="send" type="submit">Ask</button>
+      </form>
+    </main>
+
+    <script>
+      const form = document.getElementById("ask");
+      const queryEl = document.getElementById("query");
+      const answerEl = document.getElementById("answer");
+      const sendEl = document.getElementById("send");
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const query = queryEl.value.trim();
+        if (!query) return;
+
+        answerEl.textContent = "";
+        sendEl.disabled = true;
+        try {
+          const response = await fetch("/api/answer", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query, mode: "citizen", language: "en" }),
+          });
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          for (;;) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            answerEl.textContent += decoder.decode(value, { stream: true });
+          }
+        } catch (err) {
+          answerEl.textContent = "Something went wrong. Please try again.";
+        } finally {
+          sendEl.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>

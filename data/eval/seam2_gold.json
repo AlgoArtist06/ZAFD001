@@ -1,0 +1,52 @@
+{
+  "description": "Seam 2 gold evaluation set. Each case is hand-verified against the bare-act text: a supported query must cite the correct section; an out-of-scope or advice-seeking query must fire a Refusal. The English subset (language 'en') is the only one populated for issue 02; Hindi, Tamil, and Gujarati cases are added by the multilingual issues.",
+  "cases": [
+    {
+      "id": "bns-303-theft-en",
+      "query": "What is the punishment for theft of movable property?",
+      "language": "en",
+      "mode": "citizen",
+      "expected_act_id": "bns",
+      "expected_section": "303"
+    },
+    {
+      "id": "bns-318-cheating-en",
+      "query": "Someone cheated me by fraud and took my property dishonestly",
+      "language": "en",
+      "mode": "citizen",
+      "expected_act_id": "bns",
+      "expected_section": "318"
+    },
+    {
+      "id": "cpa-35-complaint-en",
+      "query": "How do I file a consumer complaint about goods sold to me?",
+      "language": "en",
+      "mode": "citizen",
+      "expected_act_id": "cpa",
+      "expected_section": "35"
+    },
+    {
+      "id": "constitution-21-liberty-en",
+      "query": "What protects my life and personal liberty?",
+      "language": "en",
+      "mode": "citizen",
+      "expected_act_id": "constitution",
+      "expected_section": "21"
+    },
+    {
+      "id": "copyright-51-infringed-en",
+      "query": "Someone copied my work without a licence, is my copyright infringed?",
+      "language": "en",
+      "mode": "citizen",
+      "expected_act_id": "copyright",
+      "expected_section": "51"
+    },
+    {
+      "id": "refusal-out-of-scope-en",
+      "query": "What is the best recipe for biryani?",
+      "language": "en",
+      "mode": "citizen",
+      "expect_refusal": true
+    }
+  ]
+}
