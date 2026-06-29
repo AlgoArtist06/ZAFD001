@@ -1,6 +1,6 @@
 # Next.js + shadcn scaffold with one streaming Grounded Answer
 
-Status: ready-for-agent
+Status: done
 
 ## Parent
 
@@ -31,3 +31,18 @@ This slice is the tracer bullet: type a question in a shadcn UI, watch a sourced
 ## Blocked by
 
 - None - can start immediately
+
+## Comments
+
+Built the tracer-bullet slice end to end, TDD on the backend.
+
+Backend (`rag/fastapi_app.py`): a thin FastAPI app exposing `POST /api/answer` that streams a Grounded Answer back chunk by chunk via `StreamingResponse` (no fixed `Content-Length` - chunked, not a blob).
+It is a wrapper only: it reuses the shared `stream_answer` helper over the existing `answer()` seam and adds no retrieval or grounding of its own.
+`build_demo_app()` (a uvicorn `--factory`) loads the real `data/` Source of Truth corpus; `create_app(assistant)` keeps the assistant injectable for tests.
+Replaced the ad-hoc stdlib WSGI demo as the entry point: removed `build_app`/`_read_index` and the orphaned `rag/static/index.html`, leaving `rag/api.py` as just the shared `stream_answer`/`_answer_parts` streaming helper (still used by `rag/shell_app.py`).
+
+Tests (`tests/test_fastapi_app.py`): in-scope query streams the explanation plus the verbatim cited legal basis; response is chunk-encoded (no `Content-Length`); unsupported query streams the "I do not have a sourced answer for that" refusal. Trimmed `tests/test_api.py` to the streaming-helper test. Full suite green.
+
+Frontend (`web/`): Next.js 16 (App Router) + Tailwind v4 + shadcn/ui (radix/nova). The page is a client component using the shadcn `Textarea` and `Button` for the chat surface; it POSTs one English Citizen-mode question and renders the streamed answer as it arrives by reading the response body reader. `next build`, `eslint`, and `tsc --noEmit` all pass. `NEXT_PUBLIC_API_URL` overrides the default `http://localhost:8000/api/answer`.
+
+Verified end to end with uvicorn + curl: in-scope question streams a real BNS-grounded answer, out-of-scope streams the refusal, and the CORS preflight succeeds. `web/README.md` documents running both servers together.
