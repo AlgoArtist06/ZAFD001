@@ -19,7 +19,7 @@ from typing import List
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ingestion.chunker import chunk_act
 from ingestion.models import Chunk
@@ -27,16 +27,29 @@ from ingestion.parser import parse_act
 from ingestion.schemes import load_scheme_chunks
 from rag.answer import LegalAssistant
 from rag.api import stream_answer
+from rag.followup import rewrite_followup
 
 _DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 
+# How many recent turns of a Conversation seed follow-up rewriting, mirroring
+# Conversation._CONTEXT_TURNS so this stateless path remembers exactly as much
+# as the in-process and persisted ones.
+_CONTEXT_TURNS = 4
+
 
 class AnswerRequest(BaseModel):
-    """One Citizen-mode English question for the tracer-bullet slice."""
+    """One question in a Conversation, optionally carrying its recent turns.
+
+    The shell keeps a Conversation's history client-side (in-memory for this
+    slice) and replays the recent turns as ``context``, oldest first, so a
+    dependent follow-up can be resolved against them. A fresh Conversation sends
+    no context, so nothing carries across from a previous one.
+    """
 
     query: str
     mode: str = "citizen"
     language: str = "en"
+    context: List[str] = Field(default_factory=list)
 
 
 def create_app(assistant: LegalAssistant) -> FastAPI:
@@ -58,8 +71,12 @@ def create_app(assistant: LegalAssistant) -> FastAPI:
 
     @app.post("/api/answer")
     def answer(request: AnswerRequest) -> StreamingResponse:
+        # Resolve a dependent follow-up against the Conversation's recent turns
+        # before retrieval, routing through the same memory seam the in-process
+        # Conversation uses; a self-contained query is returned unchanged.
+        resolved = rewrite_followup(request.query, request.context[-_CONTEXT_TURNS:])
         parts = stream_answer(
-            assistant, request.query, request.mode, request.language
+            assistant, resolved, request.mode, request.language
         )
         return StreamingResponse(parts, media_type="text/plain; charset=utf-8")
 

@@ -1,6 +1,6 @@
 # ChatGPT-style shell layout: sidebar, central chat, new chat
 
-Status: ready-for-agent
+Status: done
 
 ## Parent
 
@@ -28,3 +28,21 @@ The focus here is the layout, the conversation thread, the new-chat flow, and mu
 ## Blocked by
 
 - `12-nextjs-shadcn-scaffold-streaming-answer.md`
+
+## Comments
+
+Built test-first (red -> green -> refactor).
+
+Frontend (`web/`): grew the single-input page into a ChatGPT-style shell in `src/components/shell.tsx`, rendered by `src/app/page.tsx`.
+A shadcn/ui sidebar (`aside`) carries the brand, a clear `+ New chat` action, and the session's Conversation list; the central column is a scrollable thread of user/assistant bubbles that streams each Grounded Answer in place via the existing chunk-by-chunk fetch reader.
+Conversations live in client-side React state for this slice (in-memory, as the issue scopes).
+New chat opens a fresh empty Conversation and makes it active; selecting a Conversation switches the thread.
+The layout stacks the sidebar above the thread on narrow viewports and sits it left on wider ones, with the thread centered (`max-w-2xl`) so it stays readable.
+
+Multi-turn memory: each turn sends the active Conversation's prior user turns as `context`; the FastAPI `/api/answer` endpoint now routes that through the existing `rewrite_followup` seam (bounded to the last 4 turns, mirroring `Conversation._CONTEXT_TURNS`) before retrieval.
+A fresh Conversation sends empty context, so memory never carries across Conversations.
+
+Tooling: added Vitest + Testing Library to `web/` (no `@vitejs/plugin-react` - it conflicts with shadcn's Babel 7; Vitest's oxc transform handles JSX).
+Tests cover streaming a turn into the thread, the new-chat flow, follow-up context, and no cross-Conversation memory.
+
+Verified: `web` vitest (4), `npm run lint`, `tsc --noEmit`, `next build` all clean; full Python suite green, including two new `tests/test_fastapi_app.py` cases pinning the context-aware follow-up over HTTP.

@@ -42,3 +42,32 @@ def test_post_unsupported_query_streams_the_refusal(corpus):
     )
     assert response.status_code == 200
     assert "I do not have a sourced answer for that" in response.text
+
+
+def test_dependent_followup_is_answered_using_supplied_context(corpus):
+    """A follow-up routes through the memory seam when prior turns are supplied.
+
+    The frontend keeps a Conversation's turns client-side and replays the recent
+    ones as ``context``; the endpoint resolves the dependent follow-up against
+    them via the existing rewrite seam, so "it" reaches the cheating section.
+    """
+    response = _client(corpus).post(
+        "/api/answer",
+        json={
+            "query": "What is the punishment for it?",
+            "context": ["Someone cheated me by fraud and took my property dishonestly"],
+        },
+    )
+    assert response.status_code == 200
+    assert "I do not have a sourced answer for that" not in response.text
+    assert "318" in response.text
+
+
+def test_followup_without_context_starts_fresh_and_refuses(corpus):
+    """A fresh Conversation carries no memory: the same follow-up, with no
+    context, has nothing to resolve against and is refused - so starting a new
+    chat cannot inherit a previous one's turns."""
+    response = _client(corpus).post(
+        "/api/answer", json={"query": "What is the punishment for it?"}
+    )
+    assert "I do not have a sourced answer for that" in response.text
