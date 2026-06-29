@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Legal Awareness Assistant</title>
+    <!--
+      Signup and login are owned by Clerk. Set the publishable key below (or
+      inject it server-side) to enable hosted signup/login; the shell uses the
+      Clerk session token as the Bearer credential on every /api call. When no
+      key is configured the page falls back to a local dev session so the
+      offline demo path still runs.
+    -->
+    <meta name="clerk-publishable-key" content="" />
+    <style>
+      :root { color-scheme: light; --line: #e3e6ea; --muted: #5b6470; --accent: #1a73e8; }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: #f5f6f8;
+        color: #1c1f23;
+        /* Large, readable type for low-literacy comfort. */
+        font-size: 18px;
+        line-height: 1.6;
+      }
+      .app { display: grid; grid-template-columns: 280px 1fr; height: 100vh; }
+
+      /* Sidebar: past Conversations + new-chat action */
+      .sidebar {
+        background: #f0f1f4;
+        border-right: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      .sidebar-head { padding: 16px; border-bottom: 1px solid var(--line); }
+      .brand { font-size: 15px; font-weight: 700; margin: 0 0 12px; }
+      .new-chat {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #fff;
+        font: inherit;
+        font-weight: 600;
+        text-align: left;
+        cursor: pointer;
+      }
+      .new-chat:hover { border-color: #cfd4da; }
+
+      /* Privacy notice + consent, presented at signup */
+      .consent-dialog {
+        max-width: 560px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 24px;
+      }
+      .consent-dialog::backdrop { background: rgba(20, 24, 28, 0.45); }
+      .consent-title { margin: 0 0 12px; font-size: 18px; }
+      .consent-notice {
+        white-space: pre-wrap;
+        font: inherit;
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--muted);
+        max-height: 320px;
+        overflow-y: auto;
+        margin: 0 0 16px;
+      }
+      .consent-check { display: flex; gap: 8px; font-size: 14px; margin-bottom: 16px; }
+
+      /* Per-conversation delete + account erasure */
+      .danger {
+        margin-top: 8px;
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid #e6c9c9;
+        border-radius: 8px;
+        background: #fff;
+        color: #b3261e;
+        font: inherit;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .danger:hover { background: #fbecec; }
+      .convo-del {
+        margin-left: auto;
+        border: none;
+        background: none;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 13px;
+        line-height: 1;
+      }
+      .convo-del:hover { color: #b3261e; }
+      .convos { list-style: none; margin: 0; padding: 8px; overflow-y: auto; flex: 1; min-height: 0; }
+      .convo {
+        padding: 10px 12px;
+        border-radius: 10px;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 14px;
+      }
+      .convo:hover { background: #e6e8ec; }
+      .convo.active { background: #e0e7f8; }
+      .convo .title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .badge {
+        align-self: flex-start;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 1px 8px;
+      }
+      .sidebar-foot { padding: 12px 16px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+      .sidebar-foot button { border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; padding: 0; }
+
+      /* Main chat column */
+      .main { display: flex; flex-direction: column; min-height: 0; }
+      .thread { flex: 1; overflow-y: auto; padding: 28px 0; }
+      .thread-inner { max-width: 720px; margin: 0 auto; padding: 0 20px; }
+      .empty { color: #5b6470; text-align: center; margin-top: 8vh; }
+      .empty-title { font-size: 22px; font-weight: 700; color: #1c1f23; margin: 0 0 6px; }
+      .empty-sub { margin: 0 0 24px; font-size: 16px; }
+
+      /* Icon-led category tiles, one per Covered Domain, for the empty state. */
+      .tiles {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 12px;
+        text-align: left;
+      }
+      .tile {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: #fff;
+        font: inherit;
+        font-size: 17px;
+        font-weight: 600;
+        color: #1c1f23;
+        cursor: pointer;
+        text-align: left;
+      }
+      .tile:hover { border-color: var(--accent); background: #f3f7ff; }
+      .tile-icon { font-size: 28px; line-height: 1; }
+      .tile-label { line-height: 1.3; }
+
+      /* A clear, dismissible error banner instead of a silent failure. */
+      .error {
+        max-width: 720px;
+        margin: 0 auto 16px;
+        padding: 14px 16px;
+        border: 1px solid #e6c9c9;
+        border-radius: 12px;
+        background: #fbecec;
+        color: #8c1d18;
+        font-size: 16px;
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+      }
+      .error[hidden] { display: none; }
+      .error button {
+        margin-left: auto;
+        border: 0;
+        background: none;
+        color: inherit;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      /* The Disclaimer + Legal-Aid Pointer: a persistent footer everywhere. */
+      .disclaimer {
+        max-width: 720px;
+        margin: 12px auto 0;
+        padding-top: 10px;
+        border-top: 1px solid var(--line);
+        font-size: 14px;
+        color: var(--muted);
+        text-align: center;
+      }
+      .turn { margin-bottom: 22px; }
+      .role { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
+      .bubble {
+        white-space: pre-wrap;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 16px 18px;
+        line-height: 1.55;
+        font-size: 15px;
+      }
+      .turn.user .bubble { background: #eef2fb; border-color: #d7e0f6; }
+
+      .composer { border-top: 1px solid var(--line); background: #f5f6f8; }
+      .composer-inner { max-width: 720px; margin: 0 auto; padding: 16px 20px 24px; }
+      .start-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; font-size: 13px; color: var(--muted); }
+      .start-row select { font: inherit; padding: 4px 8px; border: 1px solid #cfd4da; border-radius: 8px; }
+      form { display: flex; gap: 8px; }
+      textarea {
+        flex: 1;
+        resize: vertical;
+        min-height: 56px;
+        padding: 12px 14px;
+        border: 1px solid #cfd4da;
+        border-radius: 10px;
+        font: inherit;
+      }
+      button.send {
+        align-self: flex-end;
+        padding: 12px 18px;
+        border: 0;
+        border-radius: 10px;
+        background: var(--accent);
+        color: #fff;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button.send:disabled { opacity: 0.5; cursor: default; }
+    </style>
+  </head>
+  <body>
+    <!-- Presented at signup: the privacy notice and explicit consent. The app
+         stays blurred behind it until the user consents. -->
+    <dialog id="consent" class="consent-dialog">
+      <h2 class="consent-title">Privacy and consent</h2>
+      <pre id="consent-notice" class="consent-notice">Loading privacy notice…</pre>
+      <label class="consent-check">
+        <input id="consent-accept" type="checkbox" />
+        I have read the privacy notice and consent to it.
+      </label>
+      <button id="consent-continue" class="send" type="button" disabled>Agree and continue</button>
+    </dialog>
+
+    <div class="app">
+      <aside class="sidebar">
+        <div class="sidebar-head">
+          <p class="brand">Legal Awareness Assistant</p>
+          <button id="new-chat" class="new-chat" type="button">+ New chat</button>
+        </div>
+        <ul id="convos" class="convos"></ul>
+        <div class="sidebar-foot">
+          <span id="who">Signing in…</span>
+          <button id="sign-out" type="button" hidden>Sign out</button>
+          <button id="delete-account" class="danger" type="button">Delete account and all data</button>
+        </div>
+      </aside>
+
+      <main class="main">
+        <div class="thread"><div id="thread" class="thread-inner">
+          <div class="empty">
+            <p class="empty-title">What do you want to understand?</p>
+            <p class="empty-sub">Pick a topic, or just type your question below.<br />Every answer is grounded in a cited government source.</p>
+            <div class="tiles">
+              <button class="tile" type="button" data-q="What are my rights as a consumer if a product is defective?">
+                <span class="tile-icon" aria-hidden="true">🛒</span>
+                <span class="tile-label">Consumer rights</span>
+              </button>
+              <button class="tile" type="button" data-q="What is the punishment for theft of movable property?">
+                <span class="tile-icon" aria-hidden="true">⚖️</span>
+                <span class="tile-label">Criminal law</span>
+              </button>
+              <button class="tile" type="button" data-q="What are my fundamental rights under the Constitution?">
+                <span class="tile-icon" aria-hidden="true">🛡️</span>
+                <span class="tile-label">Fundamental rights</span>
+              </button>
+              <button class="tile" type="button" data-q="How do I protect my intellectual property rights?">
+                <span class="tile-icon" aria-hidden="true">💡</span>
+                <span class="tile-label">Intellectual property</span>
+              </button>
+              <button class="tile" type="button" data-q="What government schemes can help me, and how do I apply?">
+                <span class="tile-icon" aria-hidden="true">🏛️</span>
+                <span class="tile-label">Government schemes</span>
+              </button>
+            </div>
+          </div>
+        </div></div>
+
+        <div class="composer"><div class="composer-inner">
+          <div id="error" class="error" role="alert" hidden>
+            <span id="error-text">Something went wrong. Please try again.</span>
+            <button id="error-dismiss" type="button" aria-label="Dismiss">Dismiss</button>
+          </div>
+          <div class="start-row">
+            <label for="mode">Mode for new chats:</label>
+            <select id="mode">
+              <option value="citizen">Citizen</option>
+              <option value="professional">Professional</option>
+            </select>
+          </div>
+          <form id="ask">
+            <textarea id="query" placeholder="Ask about your rights, e.g. 'What is the punishment for theft of movable property?'" required></textarea>
+            <button id="send" class="send" type="submit">Send</button>
+          </form>
+          <p class="disclaimer">
+            This assistant gives legal information, not legal advice. For help with your
+            situation, contact a lawyer or your nearest Legal Services Authority (NALSA / DLSA).
+          </p>
+        </div></div>
+      </main>
+    </div>
+
+    <script>
+      // ---- Auth: Clerk owns signup/login; we use its session token as Bearer.
+      // No publishable key configured -> local dev session for the offline demo.
+      const clerkKey = document.querySelector('meta[name="clerk-publishable-key"]').content;
+
+      async function loadClerk(key) {
+        await new Promise((resolve, reject) => {
+          const s = document.createElement("script");
+          s.src = "https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js";
+          s.setAttribute("data-clerk-publishable-key", key);
+          s.onload = resolve;
+          s.onerror = reject;
+          document.head.appendChild(s);
+        });
+        await window.Clerk.load();
+        if (!window.Clerk.user) {
+          window.Clerk.openSignIn();
+          throw new Error("signin-required");
+        }
+      }
+
+      const auth = {
+        async token() {
+          if (clerkKey && window.Clerk) return await window.Clerk.session.getToken();
+          return "sess_dev-user"; // offline dev session
+        },
+        label() {
+          if (clerkKey && window.Clerk && window.Clerk.user) {
+            return window.Clerk.user.primaryEmailAddress?.emailAddress || "Signed in";
+          }
+          return "Local dev session";
+        },
+      };
+
+      // ---- Shell state + API helpers
+      let activeId = null;
+
+      async function api(method, path, body) {
+        const token = await auth.token();
+        const res = await fetch(path, {
+          method,
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: body ? JSON.stringify(body) : undefined,
+        });
+        if (res.status === 401) throw new Error("unauthorized");
+        return res;
+      }
+
+      const convosEl = document.getElementById("convos");
+      const threadEl = document.getElementById("thread");
+      const form = document.getElementById("ask");
+      const queryEl = document.getElementById("query");
+      const sendEl = document.getElementById("send");
+      const modeEl = document.getElementById("mode");
+      const errorEl = document.getElementById("error");
+      const errorTextEl = document.getElementById("error-text");
+
+      function showError(message) {
+        errorTextEl.textContent = message;
+        errorEl.hidden = false;
+      }
+      function clearError() {
+        errorEl.hidden = true;
+      }
+      document.getElementById("error-dismiss").addEventListener("click", clearError);
+
+      // Icon-led category tiles: fill the box with a plain starter question and send.
+      for (const tile of document.querySelectorAll(".tile")) {
+        tile.addEventListener("click", () => {
+          queryEl.value = tile.dataset.q;
+          form.requestSubmit();
+        });
+      }
+
+      async function refreshSidebar() {
+        const res = await api("GET", "/api/conversations");
+        const { conversations } = await res.json();
+        convosEl.innerHTML = "";
+        for (const c of conversations) {
+          const li = document.createElement("li");
+          li.className = "convo" + (c.id === activeId ? " active" : "");
+          li.innerHTML =
+            `<span class="badge">${c.mode}</span><span class="title">${c.title}</span>` +
+            `<button class="convo-del" title="Delete this conversation" aria-label="Delete conversation">✕</button>`;
+          li.addEventListener("click", () => selectConversation(c.id));
+          li.querySelector(".convo-del").addEventListener("click", async (event) => {
+            event.stopPropagation();
+            await api("DELETE", `/api/conversations/${c.id}`);
+            if (activeId === c.id) {
+              activeId = null;
+              threadEl.innerHTML = "";
+            }
+            refreshSidebar();
+          });
+          convosEl.appendChild(li);
+        }
+      }
+
+      function selectConversation(id) {
+        activeId = id;
+        threadEl.innerHTML = "";
+        refreshSidebar();
+      }
+
+      function addTurn(role, text) {
+        const turn = document.createElement("div");
+        turn.className = `turn ${role}`;
+        turn.innerHTML = `<div class="role">${role === "user" ? "You" : "Assistant"}</div>`;
+        const bubble = document.createElement("div");
+        bubble.className = "bubble";
+        bubble.textContent = text;
+        turn.appendChild(bubble);
+        threadEl.appendChild(turn);
+        bubble.scrollIntoView({ block: "end" });
+        return bubble;
+      }
+
+      document.getElementById("new-chat").addEventListener("click", async () => {
+        const res = await api("POST", "/api/conversations", { mode: modeEl.value });
+        const convo = await res.json();
+        selectConversation(convo.id);
+        queryEl.focus();
+      });
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const query = queryEl.value.trim();
+        if (!query) return;
+        clearError();
+        if (!activeId) {
+          const res = await api("POST", "/api/conversations", { mode: modeEl.value });
+          activeId = (await res.json()).id;
+        }
+        addTurn("user", query);
+        queryEl.value = "";
+        sendEl.disabled = true;
+        const bubble = addTurn("assistant", "");
+        try {
+          const res = await api("POST", `/api/conversations/${activeId}/messages`, { query });
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          for (;;) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            bubble.textContent += decoder.decode(value, { stream: true });
+            bubble.scrollIntoView({ block: "end" });
+          }
+        } catch (err) {
+          bubble.closest(".turn").remove();
+          showError("Something went wrong sending your message. Please try again.");
+        } finally {
+          sendEl.disabled = false;
+          refreshSidebar();
+        }
+      });
+
+      // ---- Privacy notice + consent, presented at signup before first use.
+      const consentDialog = document.getElementById("consent");
+      const consentAccept = document.getElementById("consent-accept");
+      const consentContinue = document.getElementById("consent-continue");
+      consentAccept.addEventListener("change", () => {
+        consentContinue.disabled = !consentAccept.checked;
+      });
+
+      async function ensureConsent() {
+        const notice = await (await fetch("/api/privacy-notice")).json();
+        document.getElementById("consent-notice").textContent = notice.notice;
+        consentDialog.showModal();
+        await new Promise((resolve) => {
+          consentContinue.addEventListener(
+            "click",
+            async () => {
+              await api("POST", "/api/account/consent", { accept: true });
+              consentDialog.close();
+              resolve();
+            },
+            { once: true }
+          );
+        });
+      }
+
+      // ---- Delete the whole account and all stored data (right to erasure).
+      document.getElementById("delete-account").addEventListener("click", async () => {
+        if (!confirm("Delete your account and all stored conversations? This cannot be undone.")) {
+          return;
+        }
+        await api("DELETE", "/api/account");
+        activeId = null;
+        threadEl.innerHTML = "";
+        await refreshSidebar();
+      });
+
+      // ---- Boot
+      (async () => {
+        try {
+          if (clerkKey) await loadClerk(clerkKey);
+          document.getElementById("who").textContent = auth.label();
+          await ensureConsent();
+          await refreshSidebar();
+        } catch (err) {
+          document.getElementById("who").textContent = "Sign in to continue.";
+        }
+      })();
+    </script>
+  </body>
+</html>

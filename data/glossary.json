@@ -1,0 +1,32 @@
+{
+  "description": "The Bilingual Legal Glossary: the curated, hand-verified table of critical legal terms and their correct equivalents across the Supported Languages (English, Hindi, Tamil, Gujarati). It is the deterministic backbone that keeps terminology (for example bailable versus non-bailable) from drifting in translation - both when an incoming query is normalised to English and when an answer is rendered back into the user's language. Known soft spot: official central-act translations are often unavailable to verify Tamil and Gujarati terms; any row whose translation for a language could not be checked against an official source lists that language code under 'unverified' so it is flagged rather than presented as authoritative.",
+  "terms": [
+    {"en": "theft", "hi": "चोरी", "ta": "திருட்டு", "gu": "ચોરી"},
+    {"en": "punishment", "hi": "सजा", "ta": "தண்டனை", "gu": "સજા"},
+    {"en": "movable property", "hi": "चल संपत्ति", "ta": "அசையும் சொத்து", "gu": "જંગમ મિલકત"},
+    {"en": "property", "hi": "संपत्ति", "ta": "சொத்து", "gu": "મિલકત"},
+    {"en": "cheating", "hi": "धोखाधड़ी", "ta": "ஏமாற்றுதல்", "gu": "છેતરપિંડી"},
+    {"en": "fraud", "hi": "छल", "ta": "மோசடி", "gu": "કપટ"},
+    {"en": "dishonestly", "hi": "बेईमानी", "ta": "நேர்மையற்ற முறையில்", "gu": "અપ્રામાણિકપણે", "unverified": ["ta", "gu"]},
+    {"en": "consumer complaint", "hi": "उपभोक्ता शिकायत", "ta": "நுகர்வோர் புகார்", "gu": "ગ્રાહક ફરિયાદ"},
+    {"en": "consumer", "hi": "उपभोक्ता", "ta": "நுகர்வோர்", "gu": "ગ્રાહક"},
+    {"en": "complaint", "hi": "शिकायत", "ta": "புகார்", "gu": "ફરિયાદ"},
+    {"en": "goods", "hi": "सामान", "ta": "பொருட்கள்", "gu": "માલ"},
+    {"en": "copyright", "hi": "कॉपीराइट", "ta": "பதிப்புரிமை", "gu": "કૉપીરાઇટ"},
+    {"en": "infringed", "hi": "उल्लंघन", "ta": "மீறல்", "gu": "ઉલ્લંઘન"},
+    {"en": "licence", "hi": "लाइसेंस", "ta": "உரிமம்", "gu": "લાઇસન્સ"},
+    {"en": "life", "hi": "जीवन", "ta": "உயிர்", "gu": "જીવન"},
+    {"en": "personal liberty", "hi": "व्यक्तिगत स्वतंत्रता", "ta": "தனிப்பட்ட சுதந்திரம்", "gu": "વ્યક્તિગત સ્વતંત્રતા", "unverified": ["ta", "gu"]},
+    {"en": "right", "hi": "अधिकार", "ta": "உரிமை", "gu": "અધિકાર"},
+    {"en": "bailable", "hi": "जमानती", "ta": "பிணையில் விடத்தக்க", "gu": "જામીનપાત્ર", "unverified": ["ta"]},
+    {"en": "non-bailable", "hi": "गैर-जमानती", "ta": "பிணையில் விட முடியாத", "gu": "બિનજામીનપાત્ર", "unverified": ["ta"]},
+    {"en": "police", "hi": "पुलिस", "ta": "காவல்துறை", "gu": "પોલીસ"}
+  ],
+  "domains": [
+    {"en": "criminal law", "hi": "आपराधिक कानून", "ta": "குற்றவியல் சட்டம்", "gu": "ફોજદારી કાયદો"},
+    {"en": "consumer protection law", "hi": "उपभोक्ता संरक्षण कानून", "ta": "நுகர்வோர் பாதுகாப்பு சட்டம்", "gu": "ગ્રાહક સુરક્ષા કાયદો"},
+    {"en": "intellectual property law", "hi": "बौद्धिक संपदा कानून", "ta": "அறிவுசார் சொத்து சட்டம்", "gu": "બૌદ્ધિક સંપદા કાયદો"},
+    {"en": "your fundamental rights", "hi": "आपके मौलिक अधिकार", "ta": "உங்கள் அடிப்படை உரிமைகள்", "gu": "તમારા મૂળભૂત અધિકારો"},
+    {"en": "government schemes", "hi": "सरकारी योजनाएँ", "ta": "அரசு திட்டங்கள்", "gu": "સરકારી યોજનાઓ"}
+  ]
+}

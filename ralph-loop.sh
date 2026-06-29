@@ -54,8 +54,16 @@ while true; do
 
         *)
             echo
-            echo "Ralph stopped because an error occurred."
+            echo "Ralph stopped on iteration $ITERATION because an error occurred."
             echo "Exit code: $STATUS"
+            echo
+            echo "Common causes:"
+            echo "  - Claude finished without committing (it printed the leftover"
+            echo "    files above); recover or discard them before re-running."
+            echo "  - The working tree was already dirty at the start of the run."
+            echo
+            echo "The loop halts here on purpose so leftover state does not leak"
+            echo "into the next issue. Fix the cause, then re-run ./ralph-loop.sh."
             exit $STATUS
             ;;
 
