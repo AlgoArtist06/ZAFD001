@@ -21,6 +21,7 @@ from ingestion.vectorstore import Embedder
 from rag.citation import Citation
 from rag.domain import route_domains
 from rag.expansion import expand
+from rag.followup import rewrite_followup
 from rag.generation import DeterministicGenerator, Generator, _DISCLAIMER
 from rag.guardrails import (
     ADVICE_REFUSAL_NEXT_STEP,
@@ -294,19 +295,43 @@ class Conversation:
     The Mode (Citizen or Professional) is chosen when the Conversation opens and
     is read-only thereafter; every turn answers in that Mode against the
     assistant's one corpus, retrieval index, and citation verifier.
+
+    Context is remembered across turns *within* this Conversation only: a
+    dependent follow-up ("what is the punishment for it?") is rewritten into a
+    standalone query against the bounded recent turns before retrieval, then runs
+    the same full pipeline as any other turn. The history lives on the instance,
+    so a fresh Conversation - or the stateless :meth:`LegalAssistant.answer` -
+    starts with no context and nothing leaks between Conversations.
     """
+
+    # How many recent standalone turns are kept as context for rewriting a
+    # follow-up. Bounded so context stays recent and the query cannot grow without
+    # limit over a long Conversation.
+    _CONTEXT_TURNS = 4
 
     def __init__(self, assistant: LegalAssistant, mode: str = CITIZEN):
         self._assistant = assistant
         self._mode = mode
+        self._recent: List[str] = []
 
     @property
     def mode(self) -> str:
         return self._mode
 
     def ask(self, query: str, language: str = "en") -> GroundedAnswer:
-        """Answer a turn in this Conversation's locked Mode."""
-        return self._assistant.answer(query, mode=self._mode, language=language)
+        """Answer a turn in this Conversation's locked Mode.
+
+        A dependent follow-up is first rewritten into a self-contained query using
+        the bounded recent context; the resolved query then passes through the
+        full pipeline. The resolved query is remembered so later follow-ups can
+        build on it in turn.
+        """
+        resolved = rewrite_followup(query, self._recent)
+        self._recent = (self._recent + [resolved])[-self._CONTEXT_TURNS :]
+        result = self._assistant.answer(resolved, mode=self._mode, language=language)
+        # Keep the user's actual words on the returned answer, not the rewrite.
+        result.query = query
+        return result
 
 
 def answer(

@@ -37,6 +37,10 @@ class GoldCase:
     expect_refusal: bool = False
     expect_high_stakes: bool = False
     expect_confirmation: bool = False
+    # A multi-turn case: a sequence of turns (question then dependent follow-up)
+    # run through one Conversation, with the expectation checked on the last turn.
+    # Empty for a single-turn case, whose ``query`` is used instead.
+    turns: Sequence[str] = ()
 
 
 @dataclass
@@ -84,6 +88,7 @@ def load_gold_cases(
             expect_refusal=entry.get("expect_refusal", False),
             expect_high_stakes=entry.get("expect_high_stakes", False),
             expect_confirmation=entry.get("expect_confirmation", False),
+            turns=tuple(entry.get("turns", ())),
         )
         for entry in raw["cases"]
     ]
@@ -94,8 +99,24 @@ def load_gold_cases(
     return cases
 
 
+def _answer_case(case: GoldCase, assistant: LegalAssistant):
+    """The answer a case is judged on.
+
+    A multi-turn case is run through one Conversation - so a dependent follow-up
+    resolves against the earlier turns - and judged on its final turn. A
+    single-turn case goes straight through the stateless answer path.
+    """
+    if case.turns:
+        convo = assistant.start_conversation(mode=case.mode)
+        result = None
+        for turn in case.turns:
+            result = convo.ask(turn, language=case.language)
+        return result
+    return assistant.answer(case.query, mode=case.mode, language=case.language)
+
+
 def _evaluate(case: GoldCase, assistant: LegalAssistant) -> CaseResult:
-    result = assistant.answer(case.query, mode=case.mode, language=case.language)
+    result = _answer_case(case, assistant)
 
     if case.expect_high_stakes:
         leads = result.high_stakes and result.text.index("112") < result.text.index(
