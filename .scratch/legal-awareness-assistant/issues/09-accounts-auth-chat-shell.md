@@ -38,3 +38,15 @@ Built the application shell as three thin seams plus a stdlib WSGI surface, matc
 - `rag/shell_app.py` + `rag/static/shell.html` - the ChatGPT-style layout: left sidebar of past Conversations with a per-Conversation Mode badge, a new-chat action, a central chat box with a Mode selector for new chats, and streamed responses. `/api` routes require an `Authorization: Bearer <token>` session (401 otherwise); the page loads Clerk for signup/login and uses its session token, falling back to a local dev session offline. The original `rag/api.py` demo path is left untouched.
 
 Tests: `tests/test_accounts.py`, `tests/test_store.py`, `tests/test_shell.py`, `tests/test_shell_app.py` (24 new tests). Full suite green (166). The 4 mypy errors reported are pre-existing in `rag/expansion.py`, untouched here; the new modules typecheck clean. No lint tool is configured.
+
+### Follow-up: PRD frontend stack gap (2026-06-29)
+
+This slice satisfied the backend seams (accounts, store, shell) but did NOT meet the PRD's
+frontend technology requirement.
+The PRD specifies "Frontend: Next.js with Tailwind and shadcn/ui, providing the ChatGPT-style
+shell", with Clerk auth and Postgres conversations.
+What landed instead is a Python stdlib WSGI surface plus static HTML (`rag/shell_app.py`,
+`rag/static/shell.html`), with Clerk and Postgres present only as offline stub seams.
+The real Next.js + shadcn frontend, a FastAPI streaming surface, and live Clerk/Postgres wiring
+are tracked as new issues `12`-`19`.
+This issue is left as `done`; the gap is addressed forward, not by reopening.
