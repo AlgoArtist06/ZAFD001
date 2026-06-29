@@ -31,7 +31,9 @@ from rag.guardrails import (
     soften_advice,
 )
 from rag.multilingual import (
+    GUJARATI,
     HINDI,
+    TAMIL,
     BilingualGlossary,
     confirmation_for,
     normalize_query,
@@ -42,9 +44,11 @@ from rag.verifier import verify_citations
 
 REFUSAL_TEXT = "I do not have a sourced answer for that"
 
-# Refusal copy per Supported Language, so a Hindi user is refused in Hindi.
+# Refusal copy per Supported Language, so a user is refused in their own language.
 _REFUSAL_TEXT_BY_LANGUAGE = {
     HINDI: "मेरे पास इसका कोई स्रोत-समर्थित उत्तर नहीं है",
+    TAMIL: "அந்தக் கேள்விக்கு என்னிடம் ஆதாரப்பூர்வமான பதில் இல்லை",
+    GUJARATI: "મારી પાસે તેનો કોઈ સ્રોત-આધારિત જવાબ નથી",
 }
 
 _DEFAULT_MAPPING_PATH = os.path.join(
@@ -82,6 +86,14 @@ _REFUSAL_NEXT_STEP_BY_LANGUAGE = {
     HINDI: (
         "सहायता के लिए किसी वकील या अपने निकटतम विधिक सेवा प्राधिकरण "
         "(NALSA / DLSA) से संपर्क करने पर विचार करें।"
+    ),
+    TAMIL: (
+        "உதவிக்கு, ஒரு வழக்கறிஞரை அல்லது உங்கள் அருகிலுள்ள சட்ட சேவை ஆணையத்தை "
+        "(NALSA / DLSA) தொடர்பு கொள்ளவும்."
+    ),
+    GUJARATI: (
+        "મદદ માટે, વકીલનો અથવા તમારી નજીકના કાનૂની સેવા સત્તામંડળ "
+        "(NALSA / DLSA) નો સંપર્ક કરવાનું વિચારો."
     ),
 }
 

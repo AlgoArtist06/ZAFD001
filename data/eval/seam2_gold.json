@@ -161,6 +161,130 @@
       "language": "hi",
       "mode": "citizen",
       "expect_confirmation": true
+    },
+    {
+      "id": "bns-303-theft-ta",
+      "query": "திருட்டுக்கான தண்டனை என்ன?",
+      "language": "ta",
+      "mode": "citizen",
+      "expected_act_id": "bns",
+      "expected_section": "303"
+    },
+    {
+      "id": "bns-318-cheating-ta",
+      "query": "யாரோ ஏமாற்றுதல் மூலம் என்னை ஏமாற்றி என் சொத்து நேர்மையற்ற முறையில் எடுத்தார்",
+      "language": "ta",
+      "mode": "citizen",
+      "expected_act_id": "bns",
+      "expected_section": "318"
+    },
+    {
+      "id": "cpa-35-complaint-ta",
+      "query": "எனக்கு விற்கப்பட்ட பொருட்கள் குறித்து நுகர்வோர் புகார் எப்படி பதிவு செய்வது?",
+      "language": "ta",
+      "mode": "citizen",
+      "expected_act_id": "cpa",
+      "expected_section": "35"
+    },
+    {
+      "id": "constitution-21-liberty-ta",
+      "query": "என் உயிர் மற்றும் தனிப்பட்ட சுதந்திரம் எதனால் பாதுகாக்கப்படுகிறது?",
+      "language": "ta",
+      "mode": "citizen",
+      "expected_act_id": "constitution",
+      "expected_section": "21"
+    },
+    {
+      "id": "copyright-51-infringed-ta",
+      "query": "யாரோ உரிமம் இல்லாமல் என் படைப்பை நகலெடுத்தார், என் பதிப்புரிமை மீறல் ஆனதா?",
+      "language": "ta",
+      "mode": "citizen",
+      "expected_act_id": "copyright",
+      "expected_section": "51"
+    },
+    {
+      "id": "bns-303-theft-pro-ta",
+      "query": "திருட்டு அசையும் சொத்து உடைமையில் இருந்து",
+      "language": "ta",
+      "mode": "professional",
+      "expected_act_id": "bns",
+      "expected_section": "303"
+    },
+    {
+      "id": "refusal-out-of-scope-ta",
+      "query": "சிறந்த பிரியாணி செய்முறை என்ன?",
+      "language": "ta",
+      "mode": "citizen",
+      "expect_refusal": true
+    },
+    {
+      "id": "confirmation-ambiguous-rights-ta",
+      "query": "என் உரிமைகள் என்ன?",
+      "language": "ta",
+      "mode": "citizen",
+      "expect_confirmation": true
+    },
+    {
+      "id": "bns-303-theft-gu",
+      "query": "ચોરી માટે સજા શું છે?",
+      "language": "gu",
+      "mode": "citizen",
+      "expected_act_id": "bns",
+      "expected_section": "303"
+    },
+    {
+      "id": "bns-318-cheating-gu",
+      "query": "કોઈએ છેતરપિંડી કરીને મને છેતર્યો અને મારી મિલકત અપ્રામાણિકપણે લઈ લીધી",
+      "language": "gu",
+      "mode": "citizen",
+      "expected_act_id": "bns",
+      "expected_section": "318"
+    },
+    {
+      "id": "cpa-35-complaint-gu",
+      "query": "મને વેચાયેલા માલ વિશે ગ્રાહક ફરિયાદ કેવી રીતે નોંધાવું?",
+      "language": "gu",
+      "mode": "citizen",
+      "expected_act_id": "cpa",
+      "expected_section": "35"
+    },
+    {
+      "id": "constitution-21-liberty-gu",
+      "query": "મારા જીવન અને વ્યક્તિગત સ્વતંત્રતાનું રક્ષણ શું કરે છે?",
+      "language": "gu",
+      "mode": "citizen",
+      "expected_act_id": "constitution",
+      "expected_section": "21"
+    },
+    {
+      "id": "copyright-51-infringed-gu",
+      "query": "કોઈએ લાઇસન્સ વિના મારી કૃતિ નકલ કરી, શું મારો કૉપીરાઇટ ઉલ્લંઘન થયો?",
+      "language": "gu",
+      "mode": "citizen",
+      "expected_act_id": "copyright",
+      "expected_section": "51"
+    },
+    {
+      "id": "bns-303-theft-pro-gu",
+      "query": "ચોરી જંગમ મિલકત કબજામાંથી",
+      "language": "gu",
+      "mode": "professional",
+      "expected_act_id": "bns",
+      "expected_section": "303"
+    },
+    {
+      "id": "refusal-out-of-scope-gu",
+      "query": "શ્રેષ્ઠ બિરયાની રેસીપી શું છે?",
+      "language": "gu",
+      "mode": "citizen",
+      "expect_refusal": true
+    },
+    {
+      "id": "confirmation-ambiguous-rights-gu",
+      "query": "મારા અધિકારો શું છે?",
+      "language": "gu",
+      "mode": "citizen",
+      "expect_confirmation": true
     }
   ]
 }
