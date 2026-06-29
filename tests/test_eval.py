@@ -6,7 +6,13 @@ or advice-seeking input. Here we load the English subset and require every case
 to hold against the offline corpus.
 """
 from rag.answer import LegalAssistant
-from rag.eval import ENGLISH, load_gold_cases, run_gold_eval
+from rag.eval import (
+    ENGLISH,
+    SUPPORTED_LANGUAGES,
+    load_gold_cases,
+    run_final_eval,
+    run_gold_eval,
+)
 
 
 def test_english_gold_subset_is_non_empty():
@@ -51,6 +57,49 @@ def test_old_ipc_number_gold_case_resolves_to_current_bns(corpus):
     assert cases, "expected a gold case covering an old IPC number"
     report = run_gold_eval(LegalAssistant(corpus), cases)
     assert report.failures == []
+
+
+def test_final_eval_covers_every_supported_language(corpus):
+    """The final eval pass runs a non-empty gold subset for each of the four
+    Supported Languages, not just English."""
+    report = run_final_eval(LegalAssistant(corpus))
+    assert set(report.by_language) == set(SUPPORTED_LANGUAGES)
+    assert set(SUPPORTED_LANGUAGES) == {"en", "hi", "ta", "gu"}
+    for language in SUPPORTED_LANGUAGES:
+        assert report.by_language[language].report.total > 0
+
+
+def test_final_eval_meets_the_accuracy_bar_for_each_language(corpus):
+    """Every Supported Language's subset must clear the accuracy bar, and the
+    final pass as a whole passes only when all of them do."""
+    report = run_final_eval(LegalAssistant(corpus))
+    for language in SUPPORTED_LANGUAGES:
+        result = report.by_language[language]
+        assert result.meets_bar, (
+            f"{language} accuracy {result.accuracy} below bar {result.bar}: "
+            f"{[c.id for c in result.report.failures]}"
+        )
+    assert report.passed
+
+
+def test_final_eval_fails_when_a_language_misses_the_bar(corpus):
+    """A pass that cannot fail proves nothing: an impossible bar of 100% with a
+    deliberately wrong expectation must make that language miss the bar and the
+    whole pass fail."""
+    from rag.eval import GoldCase
+
+    bogus = [
+        GoldCase(
+            id="ta-wrong-section",
+            query="திருட்டுக்கான தண்டனை என்ன?",
+            language="ta",
+            expected_section="999",
+            expected_act_id="bns",
+        )
+    ]
+    report = run_final_eval(LegalAssistant(corpus), cases_by_language={"ta": bogus}, bar=1.0)
+    assert not report.by_language["ta"].meets_bar
+    assert not report.passed
 
 
 def test_gold_eval_catches_a_wrong_section(corpus):

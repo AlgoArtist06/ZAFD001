@@ -21,6 +21,9 @@
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         background: #f5f6f8;
         color: #1c1f23;
+        /* Large, readable type for low-literacy comfort. */
+        font-size: 18px;
+        line-height: 1.6;
       }
       .app { display: grid; grid-template-columns: 280px 1fr; height: 100vh; }
 
@@ -123,7 +126,71 @@
       .main { display: flex; flex-direction: column; min-height: 0; }
       .thread { flex: 1; overflow-y: auto; padding: 28px 0; }
       .thread-inner { max-width: 720px; margin: 0 auto; padding: 0 20px; }
-      .empty { color: #9aa3ad; text-align: center; margin-top: 18vh; line-height: 1.6; }
+      .empty { color: #5b6470; text-align: center; margin-top: 8vh; }
+      .empty-title { font-size: 22px; font-weight: 700; color: #1c1f23; margin: 0 0 6px; }
+      .empty-sub { margin: 0 0 24px; font-size: 16px; }
+
+      /* Icon-led category tiles, one per Covered Domain, for the empty state. */
+      .tiles {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 12px;
+        text-align: left;
+      }
+      .tile {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: #fff;
+        font: inherit;
+        font-size: 17px;
+        font-weight: 600;
+        color: #1c1f23;
+        cursor: pointer;
+        text-align: left;
+      }
+      .tile:hover { border-color: var(--accent); background: #f3f7ff; }
+      .tile-icon { font-size: 28px; line-height: 1; }
+      .tile-label { line-height: 1.3; }
+
+      /* A clear, dismissible error banner instead of a silent failure. */
+      .error {
+        max-width: 720px;
+        margin: 0 auto 16px;
+        padding: 14px 16px;
+        border: 1px solid #e6c9c9;
+        border-radius: 12px;
+        background: #fbecec;
+        color: #8c1d18;
+        font-size: 16px;
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+      }
+      .error[hidden] { display: none; }
+      .error button {
+        margin-left: auto;
+        border: 0;
+        background: none;
+        color: inherit;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      /* The Disclaimer + Legal-Aid Pointer: a persistent footer everywhere. */
+      .disclaimer {
+        max-width: 720px;
+        margin: 12px auto 0;
+        padding-top: 10px;
+        border-top: 1px solid var(--line);
+        font-size: 14px;
+        color: var(--muted);
+        text-align: center;
+      }
       .turn { margin-bottom: 22px; }
       .role { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
       .bubble {
@@ -193,10 +260,39 @@
 
       <main class="main">
         <div class="thread"><div id="thread" class="thread-inner">
-          <p class="empty">Start a new chat to ask about your rights.<br />Every answer is grounded in a cited government source.</p>
+          <div class="empty">
+            <p class="empty-title">What do you want to understand?</p>
+            <p class="empty-sub">Pick a topic, or just type your question below.<br />Every answer is grounded in a cited government source.</p>
+            <div class="tiles">
+              <button class="tile" type="button" data-q="What are my rights as a consumer if a product is defective?">
+                <span class="tile-icon" aria-hidden="true">🛒</span>
+                <span class="tile-label">Consumer rights</span>
+              </button>
+              <button class="tile" type="button" data-q="What is the punishment for theft of movable property?">
+                <span class="tile-icon" aria-hidden="true">⚖️</span>
+                <span class="tile-label">Criminal law</span>
+              </button>
+              <button class="tile" type="button" data-q="What are my fundamental rights under the Constitution?">
+                <span class="tile-icon" aria-hidden="true">🛡️</span>
+                <span class="tile-label">Fundamental rights</span>
+              </button>
+              <button class="tile" type="button" data-q="How do I protect my intellectual property rights?">
+                <span class="tile-icon" aria-hidden="true">💡</span>
+                <span class="tile-label">Intellectual property</span>
+              </button>
+              <button class="tile" type="button" data-q="What government schemes can help me, and how do I apply?">
+                <span class="tile-icon" aria-hidden="true">🏛️</span>
+                <span class="tile-label">Government schemes</span>
+              </button>
+            </div>
+          </div>
         </div></div>
 
         <div class="composer"><div class="composer-inner">
+          <div id="error" class="error" role="alert" hidden>
+            <span id="error-text">Something went wrong. Please try again.</span>
+            <button id="error-dismiss" type="button" aria-label="Dismiss">Dismiss</button>
+          </div>
           <div class="start-row">
             <label for="mode">Mode for new chats:</label>
             <select id="mode">
@@ -208,6 +304,10 @@
             <textarea id="query" placeholder="Ask about your rights, e.g. 'What is the punishment for theft of movable property?'" required></textarea>
             <button id="send" class="send" type="submit">Send</button>
           </form>
+          <p class="disclaimer">
+            This assistant gives legal information, not legal advice. For help with your
+            situation, contact a lawyer or your nearest Legal Services Authority (NALSA / DLSA).
+          </p>
         </div></div>
       </main>
     </div>
@@ -266,6 +366,25 @@
       const queryEl = document.getElementById("query");
       const sendEl = document.getElementById("send");
       const modeEl = document.getElementById("mode");
+      const errorEl = document.getElementById("error");
+      const errorTextEl = document.getElementById("error-text");
+
+      function showError(message) {
+        errorTextEl.textContent = message;
+        errorEl.hidden = false;
+      }
+      function clearError() {
+        errorEl.hidden = true;
+      }
+      document.getElementById("error-dismiss").addEventListener("click", clearError);
+
+      // Icon-led category tiles: fill the box with a plain starter question and send.
+      for (const tile of document.querySelectorAll(".tile")) {
+        tile.addEventListener("click", () => {
+          queryEl.value = tile.dataset.q;
+          form.requestSubmit();
+        });
+      }
 
       async function refreshSidebar() {
         const res = await api("GET", "/api/conversations");
@@ -321,6 +440,7 @@
         event.preventDefault();
         const query = queryEl.value.trim();
         if (!query) return;
+        clearError();
         if (!activeId) {
           const res = await api("POST", "/api/conversations", { mode: modeEl.value });
           activeId = (await res.json()).id;
@@ -340,7 +460,8 @@
             bubble.scrollIntoView({ block: "end" });
           }
         } catch (err) {
-          bubble.textContent = "Something went wrong. Please try again.";
+          bubble.closest(".turn").remove();
+          showError("Something went wrong sending your message. Please try again.");
         } finally {
           sendEl.disabled = false;
           refreshSidebar();

@@ -55,6 +55,51 @@ def test_root_serves_the_shell_with_sidebar_and_chat(corpus):
     assert b"clerk" in body.lower()
 
 
+def test_shell_offers_icon_led_category_tiles_for_the_covered_domains(corpus):
+    """Low-literacy polish: the empty state leads with icon-led tiles, one per
+    Covered Domain, so a Citizen can pick a topic instead of facing a blank box."""
+    app, _ = _app(corpus)
+    _, _, body = _call(app, "GET", "/")
+    text = body.decode("utf-8")
+    assert 'class="tiles"' in text
+    # One tile per Covered Domain, each with a plain-language label.
+    for label in [
+        "Consumer rights",
+        "Criminal law",
+        "Fundamental rights",
+        "Intellectual property",
+        "Government schemes",
+    ]:
+        assert label in text
+    # Each tile is icon-led: tiles carry an icon element.
+    assert text.count('class="tile-icon"') >= 5
+
+
+def test_shell_has_clear_empty_and_error_states(corpus):
+    """The empty state invites a first question and the error state is a
+    distinct, handled region rather than a silent failure."""
+    app, _ = _app(corpus)
+    _, _, body = _call(app, "GET", "/")
+    text = body.decode("utf-8")
+    assert 'class="empty"' in text
+    # A dedicated, dismissible error banner the script can show on failure.
+    assert 'id="error"' in text
+    assert 'class="error"' in text
+
+
+def test_shell_footer_carries_the_disclaimer_and_legal_aid_pointer(corpus):
+    """The Disclaimer and its Legal-Aid Pointer are a persistent footer, worded
+    consistently with the backend's pointer rather than re-invented in the UI."""
+    from rag.guardrails import LEGAL_AID_POINTER
+
+    app, _ = _app(corpus)
+    _, _, body = _call(app, "GET", "/")
+    text = body.decode("utf-8")
+    assert 'class="disclaimer"' in text
+    # The same Legal-Aid Pointer the grounded answers use (NALSA / DLSA).
+    assert LEGAL_AID_POINTER in text
+
+
 def test_listing_conversations_requires_a_session(corpus):
     app, _ = _app(corpus)
     status, _, _ = _call(app, "GET", "/api/conversations")

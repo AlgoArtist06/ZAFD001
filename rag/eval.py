@@ -13,11 +13,19 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass, field
-from typing import List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence
 
 from rag.answer import LegalAssistant
 
 ENGLISH = "en"
+
+# The four Supported Languages, in the order the final eval pass reports them.
+SUPPORTED_LANGUAGES = ("en", "hi", "ta", "gu")
+
+# The accuracy a per-language gold subset must clear in the final pass. The
+# curated subsets are hand-verified to hold completely, so the bar is total
+# correctness; a single regression in any language fails the pass.
+ACCURACY_BAR = 1.0
 
 _GOLD_PATH = os.path.join(
     os.path.dirname(os.path.dirname(__file__)), "data", "eval", "seam2_gold.json"
@@ -167,3 +175,63 @@ def run_gold_eval(
 ) -> EvalReport:
     """Run every gold case through the answer seam and tally the outcomes."""
     return EvalReport(results=[_evaluate(case, assistant) for case in cases])
+
+
+@dataclass
+class LanguageEvalResult:
+    """One Supported Language's outcome in the final eval pass."""
+
+    language: str
+    report: EvalReport
+    bar: float = ACCURACY_BAR
+
+    @property
+    def accuracy(self) -> float:
+        """The fraction of the language's gold cases that held (0 if empty)."""
+        if self.report.total == 0:
+            return 0.0
+        return self.report.passed / self.report.total
+
+    @property
+    def meets_bar(self) -> bool:
+        """Whether this language cleared the accuracy bar on a non-empty subset."""
+        return self.report.total > 0 and self.accuracy >= self.bar
+
+
+@dataclass
+class FinalEvalReport:
+    """The final per-language pass: one :class:`LanguageEvalResult` per language."""
+
+    by_language: Dict[str, LanguageEvalResult] = field(default_factory=dict)
+
+    @property
+    def passed(self) -> bool:
+        """The whole pass holds only when every Supported Language clears its bar."""
+        return bool(self.by_language) and all(
+            result.meets_bar for result in self.by_language.values()
+        )
+
+
+def run_final_eval(
+    assistant: LegalAssistant,
+    languages: Sequence[str] = SUPPORTED_LANGUAGES,
+    bar: float = ACCURACY_BAR,
+    cases_by_language: Optional[Dict[str, Sequence[GoldCase]]] = None,
+) -> FinalEvalReport:
+    """Run the gold eval for every Supported Language and check the accuracy bar.
+
+    For each language the curated gold subset (or an override in
+    ``cases_by_language``) runs through the real answer seam, and its accuracy is
+    held against ``bar``. The whole pass holds only when each language does.
+    """
+    by_language: Dict[str, LanguageEvalResult] = {}
+    for language in languages:
+        if cases_by_language is not None and language in cases_by_language:
+            cases: Sequence[GoldCase] = cases_by_language[language]
+        else:
+            cases = load_gold_cases(language=language)
+        report = run_gold_eval(assistant, cases)
+        by_language[language] = LanguageEvalResult(
+            language=language, report=report, bar=bar
+        )
+    return FinalEvalReport(by_language=by_language)
