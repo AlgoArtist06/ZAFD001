@@ -83,6 +83,46 @@ describe("Shell", () => {
     expect(headers.Authorization).toBe("Bearer sess_asha");
   });
 
+  it("routes a new Conversation through the dual-mode seam in Citizen mode by default", async () => {
+    render(<Shell />);
+    await ask("What is the punishment for theft?");
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.mode).toBe("citizen");
+  });
+
+  it("routes through Professional mode when it is chosen for a new Conversation", async () => {
+    const user = userEvent.setup();
+    render(<Shell />);
+
+    await user.click(screen.getByRole("radio", { name: /professional/i }));
+    await user.type(screen.getByLabelText(/your legal question/i), "Define abetment");
+    await user.click(screen.getByRole("button", { name: /^ask$/i }));
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.mode).toBe("professional");
+  });
+
+  it("shows each Conversation's mode as a badge in the sidebar", async () => {
+    const user = userEvent.setup();
+    render(<Shell />);
+
+    await user.click(screen.getByRole("radio", { name: /professional/i }));
+    await ask("Define abetment");
+
+    const sidebar = screen.getByRole("complementary");
+    expect(within(sidebar).getByText(/professional/i)).toBeInTheDocument();
+  });
+
+  it("locks the mode once the Conversation has a message", async () => {
+    render(<Shell />);
+    await ask("What is the punishment for theft?");
+    await within(screen.getByRole("log")).findByText(/The law says X\./);
+
+    // The selector is gone, so the chosen mode cannot be changed mid-Conversation.
+    expect(screen.queryByRole("radiogroup", { name: /answer mode/i })).not.toBeInTheDocument();
+  });
+
   it("does not carry memory across when a new Conversation is started", async () => {
     render(<Shell />);
     const user = await ask("Someone cheated me by fraud");

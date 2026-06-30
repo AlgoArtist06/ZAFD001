@@ -10,7 +10,17 @@ type Role = "user" | "assistant";
 
 type Turn = { role: Role; text: string };
 
-type Conversation = { id: number; turns: Turn[] };
+// The two answering profiles of the dual-mode seam. Citizen is the default for a
+// new Conversation; Professional is opted into when the Conversation is started.
+type Mode = "citizen" | "professional";
+
+type Conversation = { id: number; mode: Mode; turns: Turn[] };
+
+// How each Mode reads in the UI - on the selector and the sidebar badge.
+const MODE_LABEL: Record<Mode, string> = {
+  citizen: "Citizen",
+  professional: "Professional",
+};
 
 // The label shown for a Conversation in the sidebar: its first question, or a
 // placeholder while it is still empty.
@@ -35,7 +45,7 @@ type ShellProps = { getToken?: () => Promise<string | null> };
 
 export function Shell({ getToken = async () => null }: ShellProps) {
   const [conversations, setConversations] = useState<Conversation[]>([
-    { id: 1, turns: [] },
+    { id: 1, mode: "citizen", turns: [] },
   ]);
   const [activeId, setActiveId] = useState(1);
   const [nextId, setNextId] = useState(2);
@@ -50,10 +60,20 @@ export function Shell({ getToken = async () => null }: ShellProps) {
     );
   }
 
+  // The Mode is chosen only while the Conversation is empty; once it carries
+  // turns it is locked, so a message never changes the profile mid-Conversation.
+  function setActiveMode(mode: Mode) {
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === activeId && c.turns.length === 0 ? { ...c, mode } : c,
+      ),
+    );
+  }
+
   function newChat() {
     const id = nextId;
     setNextId(id + 1);
-    setConversations((prev) => [...prev, { id, turns: [] }]);
+    setConversations((prev) => [...prev, { id, mode: "citizen", turns: [] }]);
     setActiveId(id);
     setQuestion("");
   }
@@ -86,7 +106,7 @@ export function Shell({ getToken = async () => null }: ShellProps) {
       const response = await fetch(apiUrl("/api/answer"), {
         method: "POST",
         headers,
-        body: JSON.stringify({ query, context }),
+        body: JSON.stringify({ query, context, mode: active.mode }),
       });
       if (!response.ok || !response.body) {
         throw new Error(`Request failed (${response.status})`);
@@ -133,11 +153,16 @@ export function Shell({ getToken = async () => null }: ShellProps) {
               type="button"
               onClick={() => setActiveId(conversation.id)}
               aria-current={conversation.id === activeId}
-              className={`truncate rounded-md px-3 py-2 text-left text-sm hover:bg-muted ${
+              className={`flex flex-col items-start gap-1 rounded-md px-3 py-2 text-left text-sm hover:bg-muted ${
                 conversation.id === activeId ? "bg-muted font-medium" : ""
               }`}
             >
-              {conversationTitle(conversation)}
+              <span className="w-full truncate">
+                {conversationTitle(conversation)}
+              </span>
+              <span className="text-muted-foreground rounded border px-1.5 text-xs font-normal">
+                {MODE_LABEL[conversation.mode]}
+              </span>
             </button>
           ))}
         </nav>
@@ -180,6 +205,32 @@ export function Shell({ getToken = async () => null }: ShellProps) {
           }}
           className="space-y-3"
         >
+          {active.turns.length === 0 && (
+            <fieldset
+              role="radiogroup"
+              aria-label="Answer mode"
+              className="flex items-center gap-2 text-sm"
+            >
+              <legend className="text-muted-foreground mb-1">Answer mode</legend>
+              {(["citizen", "professional"] as Mode[]).map((mode) => (
+                <label
+                  key={mode}
+                  className={`cursor-pointer rounded-md border px-3 py-1 ${
+                    active.mode === mode ? "bg-muted font-medium" : ""
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="mode"
+                    className="sr-only"
+                    checked={active.mode === mode}
+                    onChange={() => setActiveMode(mode)}
+                  />
+                  {MODE_LABEL[mode]}
+                </label>
+              ))}
+            </fieldset>
+          )}
           <Textarea
             value={question}
             onChange={(event) => setQuestion(event.target.value)}
