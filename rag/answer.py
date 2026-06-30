@@ -38,7 +38,6 @@ from rag.multilingual import (
     TAMIL,
     BilingualGlossary,
     confirmation_for,
-    normalize_query,
 )
 from rag.recognition import recognize_ipc
 from rag.retrieval import HybridRetriever, expand_query
@@ -164,6 +163,11 @@ class LegalAssistant:
         # constrains the terminology of the answer; the same instance backs the
         # generator so both directions agree on terms.
         self._glossary = glossary or BilingualGlossary.load()
+        # Intent extraction shares the LLM config seam: with a key it uses the live
+        # model to detect the language and normalise the query to English, with the
+        # glossary terms injected as hard constraints; with no key the deterministic
+        # glossary lookup serves so the suite stays offline.
+        self._intent = settings.create_intent_extractor(self._glossary)
         self._generator = generator or settings.create_generator(self._glossary)
         # The IPC-to-BNS Mapping normalises old IPC numbers on input and
         # annotates them on output; it is never added to the retrieval corpus.
@@ -178,7 +182,7 @@ class LegalAssistant:
         # the single English Source of Truth. The answer is rendered back in the
         # detected language; an explicit non-English language is honoured when the
         # query carries no script of its own.
-        normalized = normalize_query(query, self._glossary)
+        normalized = self._intent.normalize(query)
         out_language = normalized.language if normalized.language != "en" else language
         english_query = normalized.english_query
 

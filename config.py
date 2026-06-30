@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 if TYPE_CHECKING:
     from ingestion.vectorstore import Embedder, VectorStore
     from rag.generation import Generator
-    from rag.multilingual import BilingualGlossary
+    from rag.multilingual import BilingualGlossary, IntentExtractor
 
 
 class ConfigError(ValueError):
@@ -64,6 +64,20 @@ class AppConfig:
                 self.llm_api_key, self.llm_base_url, self.llm_model
             )
         return DeterministicGenerator(glossary)
+
+    def create_intent_extractor(
+        self, glossary: "BilingualGlossary"
+    ) -> "IntentExtractor":
+        from rag.multilingual import (
+            DeterministicIntentExtractor,
+            LLMIntentExtractor,
+        )
+
+        if self.llm_api_key:
+            return LLMIntentExtractor(
+                self.llm_api_key, self.llm_base_url, self.llm_model, glossary
+            )
+        return DeterministicIntentExtractor(glossary)
 
     def create_embedder(self, dim: Optional[int] = None) -> "Embedder":
         from ingestion.vectorstore import DeterministicEmbedder, FastEmbedEmbedder

@@ -22,8 +22,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import urllib.request
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Optional, Protocol, Sequence
 
 from rag.text import content_stems
 
@@ -152,6 +153,21 @@ class BilingualGlossary:
         """The glossary's equivalent of an English term in ``language``, if any."""
         return self._en_to.get(language, {}).get(english_term)
 
+    def constraints_for(self, language: str) -> Dict[str, str]:
+        """Foreign term -> authoritative English term for a Supported Language.
+
+        These are the deterministic hard constraints injected into the LLM
+        intent-extraction prompt so a normalised query lands on the glossary's
+        English legal terms rather than whatever paraphrase the model would pick.
+        The glossary stays the source of terminology; the LLM only rewrites around
+        it.
+        """
+        return {
+            entry.by_language[language]: entry.en
+            for entry in self._entries
+            if language in entry.by_language
+        }
+
     def hindi_for(self, english_term: str) -> Optional[str]:
         """The glossary's Hindi equivalent of an English term, if it has one."""
         return self.term_for(english_term, HINDI)
@@ -193,6 +209,105 @@ def normalize_query(query: str, glossary: BilingualGlossary) -> NormalizedQuery:
         language=detect_language(query),
         english_query=glossary.to_english(query),
     )
+
+
+class IntentExtractor(Protocol):
+    """Detect the language and normalise a query to English for retrieval.
+
+    This is the same selection seam as the embedder and generator: production wires
+    a live LLM behind it, while the offline default keeps the suite deterministic.
+    Either way it returns a :class:`NormalizedQuery` whose English text drives every
+    downstream step over the single English Source of Truth.
+    """
+
+    def normalize(self, query: str) -> NormalizedQuery: ...
+
+
+class DeterministicIntentExtractor:
+    """The offline default: script-based detection and a glossary keyed lookup."""
+
+    def __init__(self, glossary: BilingualGlossary):
+        self._glossary = glossary
+
+    def normalize(self, query: str) -> NormalizedQuery:
+        return normalize_query(query, self._glossary)
+
+
+class LLMIntentExtractor:
+    """Normalise a query to English through an OpenAI-compatible LLM endpoint.
+
+    The model detects the language, extracts intent, and rewrites the query into
+    English with legal terms preserved and lay complaints mapped to legal concepts,
+    handling code-mixing such as Hinglish. The Bilingual Legal Glossary's critical
+    terms for the detected language are injected into the prompt as hard
+    constraints, so the deterministic glossary - not the model - still fixes the
+    legal terminology. A pure-English query needs no normalisation and never reaches
+    the model; if the model omits a field the deterministic path fills it in, so a
+    degraded response can never break the pipeline.
+    """
+
+    def __init__(
+        self, api_key: str, base_url: str, model: str, glossary: BilingualGlossary
+    ):
+        self._api_key = api_key
+        self._url = f"{base_url.rstrip('/')}/chat/completions"
+        self._model = model
+        self._glossary = glossary
+
+    def normalize(self, query: str) -> NormalizedQuery:
+        if not _FOREIGN_RE.search(query):
+            # Already English: nothing to normalise, so spend no LLM call.
+            return NormalizedQuery(ENGLISH, query)
+        language = detect_language(query)
+        body = json.dumps(
+            {
+                "model": self._model,
+                "response_format": {"type": "json_object"},
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": (
+                            "Normalise a user's legal question for retrieval over an "
+                            "English statute corpus. Detect the language, extract the "
+                            "intent, and rewrite the question in English. Preserve "
+                            "legal terms, map lay complaints to legal concepts, and "
+                            "keep any Latin-script words already in English "
+                            "(code-mixing). For each listed legal concept you must "
+                            "use exactly the supplied English term. Return JSON with "
+                            "language (an ISO 639-1 code) and english_query."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": json.dumps(
+                            {
+                                "query": query,
+                                "term_constraints": self._glossary.constraints_for(
+                                    language
+                                ),
+                            }
+                        ),
+                    },
+                ],
+            }
+        ).encode()
+        request = urllib.request.Request(
+            self._url,
+            data=body,
+            headers={
+                "Authorization": f"Bearer {self._api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=30) as response:
+            completion = json.loads(response.read())
+        content = json.loads(completion["choices"][0]["message"]["content"])
+        return NormalizedQuery(
+            language=content.get("language") or language,
+            english_query=content.get("english_query")
+            or self._glossary.to_english(query),
+        )
 
 
 # Ambiguous terms that, on their own, do not pin down a single Covered Domain. In
