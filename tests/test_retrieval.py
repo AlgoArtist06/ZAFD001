@@ -1,7 +1,9 @@
 """Hybrid retrieval routed by Covered Domain."""
 from ingestion.models import ActType
+from ingestion.vectorstore import DeterministicEmbedder, QdrantVectorStore
 
 from rag.domain import route_domains
+from rag.expansion import expand
 from rag.retrieval import HybridRetriever
 
 
@@ -26,3 +28,24 @@ def test_hybrid_uses_both_keyword_and_vector_signal(corpus):
     assert top.chunk.section_number == "303"
     assert top.keyword_score > 0
     assert top.vector_score > 0
+
+
+def test_qdrant_retrieval_keeps_hybrid_scores_and_domain_filtering(corpus):
+    from qdrant_client import QdrantClient
+
+    embedder = DeterministicEmbedder()
+    store = QdrantVectorStore(
+        embedder=embedder,
+        collection="retrieval_test",
+        client=QdrantClient(":memory:"),
+    )
+    store.load(corpus)
+    retriever = HybridRetriever(corpus, embedder=embedder, vector_store=store)
+
+    hits = retriever.retrieve("consumer complaint goods", [ActType.CONSUMER])
+
+    assert hits
+    assert all(hit.chunk.provenance.act_type == ActType.CONSUMER for hit in hits)
+    assert hits[0].keyword_score > 0
+    assert hits[0].vector_score > 0
+    assert expand(hits, corpus)[0].is_expanded

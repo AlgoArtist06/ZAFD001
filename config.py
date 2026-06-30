@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Mapping, Optional, Tuple
 from urllib.parse import urlparse
 
 if TYPE_CHECKING:
-    from ingestion.vectorstore import Embedder, InMemoryVectorStore
+    from ingestion.vectorstore import Embedder, VectorStore
     from rag.generation import Generator
     from rag.multilingual import BilingualGlossary
 
@@ -66,17 +66,23 @@ class AppConfig:
         return DeterministicGenerator(glossary)
 
     def create_embedder(self, dim: Optional[int] = None) -> "Embedder":
-        if self.embedder_backend != "deterministic":
-            raise ConfigError("fastembed adapter is not installed")
-        from ingestion.vectorstore import DeterministicEmbedder
+        from ingestion.vectorstore import DeterministicEmbedder, FastEmbedEmbedder
 
-        return DeterministicEmbedder(dim=dim or self.embedding_dim)
+        size = dim or self.embedding_dim
+        if self.embedder_backend == "fastembed":
+            return FastEmbedEmbedder(self.embedding_model, size)
+        return DeterministicEmbedder(dim=size)
 
-    def create_vector_store(self, embedder: "Embedder") -> "InMemoryVectorStore":
-        if self.vector_store_backend != "memory":
-            raise ConfigError("qdrant adapter is not installed")
-        from ingestion.vectorstore import InMemoryVectorStore
+    def create_vector_store(self, embedder: "Embedder") -> "VectorStore":
+        from ingestion.vectorstore import InMemoryVectorStore, QdrantVectorStore
 
+        if self.vector_store_backend == "qdrant":
+            return QdrantVectorStore(
+                embedder=embedder,
+                url=self.qdrant_url,
+                api_key=self.qdrant_api_key,
+                collection=self.qdrant_collection,
+            )
         return InMemoryVectorStore(embedder)
 
 

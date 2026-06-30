@@ -15,7 +15,7 @@ from typing import List, Sequence
 
 from config import AppConfig, load_config
 from ingestion.models import ActType, Chunk
-from ingestion.vectorstore import Embedder, _cosine
+from ingestion.vectorstore import Embedder, VectorStore, _cosine
 from rag.text import content_stems
 
 PROFESSIONAL = "professional"
@@ -67,11 +67,20 @@ class HybridRetriever:
         chunks: Sequence[Chunk],
         embedder: Embedder | None = None,
         app_config: AppConfig | None = None,
+        vector_store: VectorStore | None = None,
     ):
-        self._embedder = embedder or (app_config or load_config()).create_embedder()
+        settings = app_config or load_config()
+        self._embedder = embedder or settings.create_embedder()
+        self._store = vector_store
+        if self._store is None and settings.vector_store_backend == "qdrant":
+            self._store = settings.create_vector_store(self._embedder)
         self._chunks = list(chunks)
         self._stems = [set(content_stems(c.text)) for c in self._chunks]
-        self._vectors = [self._embedder.embed(c.text) for c in self._chunks]
+        self._vectors = (
+            []
+            if self._store is not None
+            else [self._embedder.embed(c.text) for c in self._chunks]
+        )
 
     def retrieve(
         self,
@@ -81,6 +90,27 @@ class HybridRetriever:
     ) -> List[RetrievalHit]:
         allowed = set(domains) if domains is not None else set(ActType)
         q_stems = set(content_stems(query))
+
+        if self._store is not None:
+            # ponytail: preserve the existing exact hybrid score over all filtered
+            # points; move keyword ranking into Qdrant if corpus size makes this slow.
+            candidates = self._store.search(
+                query, top_k=self._store.count(), domains=list(allowed)
+            )
+            live_hits = []
+            for hit in candidates:
+                keyword_score = len(q_stems & set(content_stems(hit.chunk.text)))
+                live_hits.append(
+                    RetrievalHit(
+                        chunk=hit.chunk,
+                        score=keyword_score + hit.score,
+                        keyword_score=keyword_score,
+                        vector_score=hit.score,
+                    )
+                )
+            live_hits.sort(key=lambda hit: hit.score, reverse=True)
+            return live_hits[:top_k]
+
         q_vec = self._embedder.embed(query)
 
         hits: List[RetrievalHit] = []

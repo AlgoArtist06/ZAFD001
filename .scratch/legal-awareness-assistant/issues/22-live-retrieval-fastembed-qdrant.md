@@ -1,6 +1,6 @@
 # Live retrieval stack: FastEmbed embeddings + Qdrant vector store
 
-Status: ready-for-agent
+Status: done
 
 ## Parent
 
@@ -29,3 +29,7 @@ Selection is keyless-safe per the config seam: with Qdrant configured, retrieval
 ## Blocked by
 
 - `20-config-seam-and-secret-hygiene.md`
+
+## Comments
+
+Implemented local CPU FastEmbed BGE embeddings, Qdrant ingestion and hybrid retrieval with complete Provenance Records, config-driven live/offline selection, Docker documentation, and offline plus live Phase-0 smoke coverage.

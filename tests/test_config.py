@@ -1,10 +1,17 @@
+import sys
+from types import SimpleNamespace
+
 import pytest
 
 from config import ConfigError, load_config
-from ingestion.vectorstore import DeterministicEmbedder, InMemoryVectorStore
+from ingestion.vectorstore import (
+    DeterministicEmbedder,
+    FastEmbedEmbedder,
+    InMemoryVectorStore,
+    QdrantVectorStore,
+)
 from rag.answer import LegalAssistant
 from rag.generation import DeterministicGenerator, OpenAICompatibleGenerator
-from rag.retrieval import HybridRetriever
 
 
 def test_load_config_applies_documented_defaults_and_typed_overrides():
@@ -103,12 +110,18 @@ def test_example_secret_placeholders_do_not_activate_live_adapters():
     assert config.generator_backend == "deterministic"
 
 
-def test_composition_points_resolve_adapters_through_config(corpus):
+def test_composition_points_resolve_adapters_through_config(monkeypatch):
     configured = load_config({"LLM_API_KEY": "test-key"})
     assert isinstance(configured.create_generator(), OpenAICompatibleGenerator)
 
-    with pytest.raises(ConfigError, match="fastembed adapter"):
-        HybridRetriever(
-            corpus,
-            app_config=load_config({"QDRANT_URL": "http://localhost:6333"}),
-        )
+    monkeypatch.setitem(
+        sys.modules,
+        "fastembed",
+        SimpleNamespace(TextEmbedding=lambda **kwargs: SimpleNamespace()),
+    )
+    live = load_config({"QDRANT_URL": "http://localhost:6333"})
+    embedder = live.create_embedder()
+    store = live.create_vector_store(embedder)
+
+    assert isinstance(embedder, FastEmbedEmbedder)
+    assert isinstance(store, QdrantVectorStore)

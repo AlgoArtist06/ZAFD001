@@ -22,7 +22,7 @@ from ingestion.models import Chunk
 from ingestion.parser import parse_act
 from ingestion.schemes import load_scheme_chunks
 from ingestion.validation import ValidationReport, validate_chunks
-from ingestion.vectorstore import InMemoryVectorStore
+from ingestion.vectorstore import VectorStore
 
 _DATA = Path(__file__).resolve().parent.parent / "data"
 
@@ -54,7 +54,7 @@ def default_config() -> IngestionConfig:
 class IngestionResult:
     chunks: List[Chunk]
     validation: ValidationReport
-    store: InMemoryVectorStore
+    store: VectorStore
     coverage: CoverageReport
     mapping: IpcBnsMapping
     mapping_verified: bool
@@ -87,7 +87,9 @@ def run_ingestion(
 
     # 4. Embed + load (no-provenance-no-answer: only validated chunks reach the store).
     settings = app_config or load_config()
-    embedder = settings.create_embedder(dim=config.embedding_dim)
+    embedder = settings.create_embedder(
+        dim=config.embedding_dim if settings.embedder_backend == "deterministic" else None
+    )
     store = settings.create_vector_store(embedder)
     store.load(validation.loadable)
 
