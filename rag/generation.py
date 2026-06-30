@@ -3,12 +3,14 @@
 Generation runs under a hard contract: answer only from retrieved Source of
 Truth text, attach a Citation to every claim, and never invent a section. The
 default :class:`DeterministicGenerator` is offline and template-based so the
-suite needs no LLM; production swaps in a Claude-backed generator (claude-opus)
-behind the same :class:`Generator` protocol, exactly as the vector store swaps a
-real embedder behind :class:`Embedder`.
+suite needs no LLM; production swaps in Google Gemini 2.5 Flash via its
+OpenAI-compatible endpoint behind the same :class:`Generator` protocol, exactly
+as the vector store swaps a real embedder behind :class:`Embedder`.
 """
 from __future__ import annotations
 
+import json
+import urllib.request
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Protocol, Sequence
 
@@ -131,6 +133,92 @@ class Generator(Protocol):
 
 
 PROFESSIONAL = "professional"
+
+
+class OpenAICompatibleGenerator:
+    """Generate a grounded draft through an OpenAI-compatible endpoint."""
+
+    def __init__(self, api_key: str, base_url: str, model: str):
+        self._api_key = api_key
+        self._url = f"{base_url.rstrip('/')}/chat/completions"
+        self._model = model
+
+    def generate(
+        self, query: str, sections: Sequence[RetrievedSection], mode: str, language: str
+    ) -> DraftAnswer:
+        sources = [
+            {
+                "act_id": section.act_id,
+                "act_name": section.provenance.act_name,
+                "act_year": section.provenance.act_year,
+                "section_number": section.section_number,
+                "source_url": section.provenance.source_url,
+                "verbatim_text": section.verbatim_text,
+            }
+            for section in sections
+        ]
+        body = json.dumps(
+            {
+                "model": self._model,
+                "response_format": {"type": "json_object"},
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": (
+                            "Return JSON with explanation, legal_basis, next_step, and "
+                            "citations. Answer only from the supplied sources. End every "
+                            "legal claim with its exact Act (year), Section citation. "
+                            "citations must be a list of act_id and section_number pairs "
+                            "from the supplied sources. If the sources do not answer the "
+                            "question, return empty strings and an empty citations list. "
+                            "Do not give personalised legal advice."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": json.dumps(
+                            {
+                                "query": query,
+                                "mode": mode,
+                                "language": language,
+                                "sources": sources,
+                            }
+                        ),
+                    },
+                ],
+            }
+        ).encode()
+        request = urllib.request.Request(
+            self._url,
+            data=body,
+            headers={
+                "Authorization": f"Bearer {self._api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=30) as response:
+            completion = json.loads(response.read())
+        content = json.loads(completion["choices"][0]["message"]["content"])
+        by_section = {
+            (section.act_id, section.section_number): section for section in sections
+        }
+        citations = []
+        for item in content.get("citations", []):
+            act_id = str(item.get("act_id", ""))
+            section_number = str(item.get("section_number", ""))
+            section = by_section.get((act_id, section_number))
+            citations.append(
+                Citation.from_section(section)
+                if section
+                else Citation(act_id, "", 0, section_number, "", "")
+            )
+        return DraftAnswer(
+            explanation=content.get("explanation", ""),
+            legal_basis=content.get("legal_basis", ""),
+            next_step=content.get("next_step", ""),
+            citations=citations,
+        )
 
 
 class DeterministicGenerator:

@@ -13,8 +13,9 @@ import re
 from dataclasses import dataclass
 from typing import List, Sequence
 
+from config import AppConfig, load_config
 from ingestion.models import ActType, Chunk
-from ingestion.vectorstore import DeterministicEmbedder, Embedder, _cosine
+from ingestion.vectorstore import Embedder, _cosine
 from rag.text import content_stems
 
 PROFESSIONAL = "professional"
@@ -61,8 +62,13 @@ class RetrievalHit:
 class HybridRetriever:
     """Keyword + vector retrieval filtered to a set of Covered Domains."""
 
-    def __init__(self, chunks: Sequence[Chunk], embedder: Embedder | None = None):
-        self._embedder = embedder or DeterministicEmbedder()
+    def __init__(
+        self,
+        chunks: Sequence[Chunk],
+        embedder: Embedder | None = None,
+        app_config: AppConfig | None = None,
+    ):
+        self._embedder = embedder or (app_config or load_config()).create_embedder()
         self._chunks = list(chunks)
         self._stems = [set(content_stems(c.text)) for c in self._chunks]
         self._vectors = [self._embedder.embed(c.text) for c in self._chunks]

@@ -99,6 +99,7 @@ class ChatShell:
         user_id = self._account(token)
         self._store.delete_all_for(user_id)
         self._consent.erase(user_id)
+        self._verifier.delete_account(user_id)
 
     def new_chat(self, token: str, mode: str = "citizen") -> ConversationRecord:
         """Open a new Conversation for the user with its Mode locked at start."""

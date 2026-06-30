@@ -1,6 +1,6 @@
 # Configuration seam and secret hygiene (prefactor)
 
-Status: ready-for-agent
+Status: done
 
 ## Parent
 
@@ -20,14 +20,26 @@ As part of the same change, fix the standing hygiene issues we identified: repla
 
 ## Acceptance criteria
 
-- [ ] A single typed configuration loader reads the variables documented in `.env.example` and applies their defaults
-- [ ] Each pluggable seam (generator, embedder, vector store) selects its implementation from config, not from a hard-coded constructor
-- [ ] With no service keys set, every seam resolves to its offline deterministic stand-in and the full test suite passes with no network and no secrets
-- [ ] Invalid or malformed configuration fails fast with a clear error rather than failing silently later
-- [ ] `.env.example` contains only placeholder values; the previously committed real-looking Gemini/Clerk keys are removed
-- [ ] The generation module docstring matches the PRD's v1 LLM decision (Gemini 2.5 Flash via OpenAI-compatible endpoint)
-- [ ] A short note documents how to create a real `.env` from `.env.example` and that `.env` stays git-ignored
+- [x] A single typed configuration loader reads the variables documented in `.env.example` and applies their defaults
+- [x] Each pluggable seam (generator, embedder, vector store) selects its implementation from config, not from a hard-coded constructor
+- [x] With no service keys set, every seam resolves to its offline deterministic stand-in and the full test suite passes with no network and no secrets
+- [x] Invalid or malformed configuration fails fast with a clear error rather than failing silently later
+- [x] `.env.example` contains only placeholder values; the previously committed real-looking Gemini/Clerk keys are removed
+- [x] The generation module docstring matches the PRD's v1 LLM decision (Gemini 2.5 Flash via OpenAI-compatible endpoint)
+- [x] A short note documents how to create a real `.env` from `.env.example` and that `.env` stays git-ignored
 
 ## Blocked by
 
 - None - can start immediately
+
+## Comments
+
+Added a typed, validated config seam for every documented environment variable.
+Generator, embedder, vector-store, and Postgres composition now read it; keyless
+runs select deterministic/in-memory adapters, while configured live adapter names
+and credentials are exposed for issues 21 and 22. Replaced committed Gemini and
+Clerk values with inert placeholders and corrected the generation documentation.
+
+Verified: 234 Python tests and 25 frontend tests pass; ESLint, TypeScript, changed-
+module mypy, and diff checks pass. Full-project mypy retains four pre-existing
+errors in untouched `rag/expansion.py`.

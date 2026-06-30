@@ -17,8 +17,9 @@ from __future__ import annotations
 import glob
 import json
 import os
-from typing import Iterator, List, Optional
+from typing import Any, Iterator, List, Optional
 
+from config import load_config
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -32,6 +33,8 @@ from rag.accounts import Account, SessionVerifier
 from rag.answer import GroundedAnswer, LegalAssistant
 from rag.followup import rewrite_followup
 from rag.privacy import NOTICE_VERSION, PRIVACY_NOTICE, ConsentLedger
+from rag.shell import ChatShell, Unauthenticated
+from rag.store import PostgresConversationStore
 
 _DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 
@@ -94,9 +97,14 @@ class AnswerRequest(BaseModel):
     """
 
     query: str
+    conversation_id: Optional[str] = None
     mode: str = "citizen"
     language: str = "en"
     context: List[str] = Field(default_factory=list)
+
+
+class ConversationRequest(BaseModel):
+    mode: str = "citizen"
 
 
 def _bearer_token(authorization: str) -> str:
@@ -109,6 +117,7 @@ def create_app(
     assistant: LegalAssistant,
     verifier: Optional[SessionVerifier] = None,
     consent: Optional[ConsentLedger] = None,
+    store: Optional[Any] = None,
 ) -> FastAPI:
     """Build a FastAPI app bound to a :class:`LegalAssistant`.
 
@@ -123,13 +132,14 @@ def create_app(
     app = FastAPI(title="Multilingual Legal Awareness Assistant")
     verifier = verifier or SessionVerifier()
     consent = consent or ConsentLedger()
+    shell = ChatShell(assistant, store=store, verifier=verifier, consent=consent)
 
     # The Next.js dev server runs on a different origin, so allow cross-origin
     # calls to the demo endpoint.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
-        allow_methods=["GET", "POST"],
+        allow_methods=["GET", "POST", "DELETE"],
         allow_headers=["*"],
     )
 
@@ -156,9 +166,54 @@ def create_app(
         record = consent.record(account.user_id)
         return {"user_id": record.user_id, "notice_version": record.notice_version}
 
+    @app.post("/api/conversations")
+    def create_conversation(
+        request: ConversationRequest,
+        account: Account = Depends(current_account),
+        authorization: str = Header(default=""),
+    ) -> dict:
+        record = shell.new_chat(_bearer_token(authorization), request.mode)
+        return {"id": record.id, "mode": record.mode, "title": record.title}
+
+    @app.get("/api/conversations/{conversation_id}")
+    def conversation_history(
+        conversation_id: str,
+        account: Account = Depends(current_account),
+        authorization: str = Header(default=""),
+    ) -> dict:
+        try:
+            turns = shell.history(_bearer_token(authorization), conversation_id)
+        except Unauthenticated:
+            raise HTTPException(status_code=404, detail="Conversation not found.")
+        return {"turns": [turn.__dict__ for turn in turns]}
+
+    @app.delete("/api/conversations/{conversation_id}")
+    def delete_conversation(
+        conversation_id: str,
+        account: Account = Depends(current_account),
+        authorization: str = Header(default=""),
+    ) -> dict:
+        """Erase one Conversation through the authenticated deletion seam."""
+        try:
+            shell.delete_conversation(_bearer_token(authorization), conversation_id)
+        except Unauthenticated:
+            raise HTTPException(status_code=404, detail="Conversation not found.")
+        return {"ok": True}
+
+    @app.delete("/api/account")
+    def delete_account(
+        account: Account = Depends(current_account),
+        authorization: str = Header(default=""),
+    ) -> dict:
+        """Erase the authenticated user's account data through the deletion seam."""
+        shell.delete_account(_bearer_token(authorization))
+        return {"ok": True}
+
     @app.post("/api/answer")
     def answer(
-        request: AnswerRequest, account: Account = Depends(current_account)
+        request: AnswerRequest,
+        account: Account = Depends(current_account),
+        authorization: str = Header(default=""),
     ) -> StreamingResponse:
         # The request is attributed to the verified user; an answer is served
         # only once that user has consented to the third-party-LLM processing.
@@ -169,8 +224,19 @@ def create_app(
         # Resolve a dependent follow-up against the Conversation's recent turns
         # before retrieval, routing through the same memory seam the in-process
         # Conversation uses; a self-contained query is returned unchanged.
-        resolved = rewrite_followup(request.query, request.context[-_CONTEXT_TURNS:])
-        result = assistant.answer(resolved, mode=request.mode, language=request.language)
+        if request.conversation_id:
+            try:
+                result = shell.send(
+                    _bearer_token(authorization),
+                    request.conversation_id,
+                    request.query,
+                    request.language,
+                )
+            except Unauthenticated:
+                raise HTTPException(status_code=404, detail="Conversation not found.")
+        else:
+            resolved = rewrite_followup(request.query, request.context[-_CONTEXT_TURNS:])
+            result = assistant.answer(resolved, mode=request.mode, language=request.language)
         return StreamingResponse(
             _answer_frames(result),
             media_type="application/x-ndjson; charset=utf-8",
@@ -198,4 +264,12 @@ def build_demo_app() -> FastAPI:
 
     Run with ``uvicorn rag.fastapi_app:build_demo_app --factory``.
     """
-    return create_app(LegalAssistant(load_demo_corpus()))
+    config = load_config()
+    store = (
+        PostgresConversationStore.from_dsn(config.database_url)
+        if config.database_url
+        else None
+    )
+    return create_app(
+        LegalAssistant(load_demo_corpus(), app_config=config), store=store
+    )

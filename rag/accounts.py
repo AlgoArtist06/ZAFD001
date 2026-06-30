@@ -47,3 +47,9 @@ class SessionVerifier:
         """Resolve a session token to its Account, or ``None`` if unknown."""
         user_id = self._sessions.get(token)
         return Account(user_id) if user_id is not None else None
+
+    def delete_account(self, user_id: str) -> None:
+        """Remove an account and invalidate every session that belongs to it."""
+        self._sessions = {
+            token: owner for token, owner in self._sessions.items() if owner != user_id
+        }

@@ -1,6 +1,6 @@
 # Data-control UI: delete a Conversation, delete account
 
-Status: ready-for-agent
+Status: done
 
 ## Parent
 
@@ -15,13 +15,25 @@ Both actions route through the existing privacy/deletion seam so deletion is enf
 
 ## Acceptance criteria
 
-- [ ] A user can delete a single Conversation from the UI; it disappears from the sidebar and from storage
-- [ ] A user can delete their entire account and all associated data after an explicit confirmation
-- [ ] Account deletion removes the user's Conversations and account record, then signs the user out
-- [ ] Both deletions are enforced server-side through the existing privacy/deletion seam
-- [ ] A deleted Conversation cannot be reloaded afterward, including on another device
-- [ ] Deletion actions are scoped to the authenticated user and cannot affect another user's data
+- [x] A user can delete a single Conversation from the UI; it disappears from the sidebar and from storage
+- [x] A user can delete their entire account and all associated data after an explicit confirmation
+- [x] Account deletion removes the user's Conversations and account record, then signs the user out
+- [x] Both deletions are enforced server-side through the existing privacy/deletion seam
+- [x] A deleted Conversation cannot be reloaded afterward, including on another device
+- [x] Deletion actions are scoped to the authenticated user and cannot affect another user's data
 
 ## Blocked by
 
 - `15-postgres-conversation-history.md`
+
+## Comments
+
+Built deletion test-first through the existing authenticated `ChatShell` seam.
+The Next.js sidebar deletes persisted Conversations by their server ID, account
+deletion requires an irreversible-action confirmation and then signs out, and
+FastAPI removes Conversation turns, consent/account state, and sessions with
+owner-scoped checks. `DATABASE_URL` selects the Postgres store in the demo app.
+
+Verified: 218 Python tests and 25 frontend tests pass; ESLint, TypeScript,
+changed-module mypy, and diff checks pass. Full-project mypy retains four
+pre-existing errors in untouched `rag/expansion.py`.
