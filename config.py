@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 
 if TYPE_CHECKING:
     from ingestion.vectorstore import Embedder, InMemoryVectorStore
-    from rag.generation import DeterministicGenerator
+    from rag.generation import Generator
     from rag.multilingual import BilingualGlossary
 
 
@@ -56,11 +56,13 @@ class AppConfig:
 
     def create_generator(
         self, glossary: Optional["BilingualGlossary"] = None
-    ) -> "DeterministicGenerator":
-        if self.generator_backend != "deterministic":
-            raise ConfigError("openai generator adapter is not installed")
-        from rag.generation import DeterministicGenerator
+    ) -> "Generator":
+        from rag.generation import DeterministicGenerator, OpenAICompatibleGenerator
 
+        if self.llm_api_key:
+            return OpenAICompatibleGenerator(
+                self.llm_api_key, self.llm_base_url, self.llm_model
+            )
         return DeterministicGenerator(glossary)
 
     def create_embedder(self, dim: Optional[int] = None) -> "Embedder":

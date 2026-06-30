@@ -3,7 +3,7 @@ import pytest
 from config import ConfigError, load_config
 from ingestion.vectorstore import DeterministicEmbedder, InMemoryVectorStore
 from rag.answer import LegalAssistant
-from rag.generation import DeterministicGenerator
+from rag.generation import DeterministicGenerator, OpenAICompatibleGenerator
 from rag.retrieval import HybridRetriever
 
 
@@ -104,8 +104,8 @@ def test_example_secret_placeholders_do_not_activate_live_adapters():
 
 
 def test_composition_points_resolve_adapters_through_config(corpus):
-    with pytest.raises(ConfigError, match="openai generator"):
-        LegalAssistant(corpus, app_config=load_config({"LLM_API_KEY": "test-key"}))
+    configured = load_config({"LLM_API_KEY": "test-key"})
+    assert isinstance(configured.create_generator(), OpenAICompatibleGenerator)
 
     with pytest.raises(ConfigError, match="fastembed adapter"):
         HybridRetriever(

@@ -1,6 +1,6 @@
 # Live Gemini-backed Grounded Answer over the existing seam
 
-Status: ready-for-agent
+Status: done
 
 ## Parent
 
@@ -29,3 +29,12 @@ Selection is keyless-safe per the config seam: with `LLM_API_KEY` present, answe
 ## Blocked by
 
 - `20-config-seam-and-secret-hygiene.md`
+
+## Comments
+
+Added a stdlib OpenAI-compatible Generator selected by the existing config seam,
+defaulting to Gemini 2.5 Flash while retaining the keyless deterministic fallback.
+Live answer-seam tests cover grounded generation, fabricated-citation refusal, and
+advice refusal before any model call. Verified 237 Python and 25 frontend tests,
+ESLint, TypeScript, and changed-file mypy; full mypy retains four pre-existing
+errors in `rag/expansion.py`.
