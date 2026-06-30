@@ -40,7 +40,15 @@ const GROUNDED_FRAMES = [
 let fetchMock: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
-  fetchMock = vi.fn(async () => streamingResponse(GROUNDED_FRAMES));
+  fetchMock = vi.fn(async (url: string, options?: RequestInit) => {
+    if (url.endsWith("/api/conversations") && options?.method === "POST") {
+      return {
+        ok: true,
+        json: async () => ({ id: "conv-server-1", mode: "citizen" }),
+      } as Response;
+    }
+    return streamingResponse(GROUNDED_FRAMES);
+  });
   vi.stubGlobal("fetch", fetchMock);
 });
 
@@ -149,6 +157,63 @@ describe("Shell", () => {
     expect(within(sidebar).getByText(/Tell me about theft/)).toBeInTheDocument();
   });
 
+  it("deletes a Conversation through the server and removes it from the sidebar", async () => {
+    fetchMock.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (url.endsWith("/api/conversations") && options?.method === "POST") {
+        return {
+          ok: true,
+          json: async () => ({ id: "conv-postgres-1", mode: "citizen" }),
+        } as Response;
+      }
+      if (options?.method === "DELETE") return { ok: true } as Response;
+      return streamingResponse(GROUNDED_FRAMES);
+    });
+    render(<Shell getToken={async () => "sess_asha"} />);
+    const user = await ask("Tell me about theft");
+    await within(screen.getByRole("log")).findByText(/The law says X\./);
+
+    await user.click(
+      screen.getByRole("button", { name: /delete conversation tell me about theft/i }),
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringMatching(/\/api\/conversations\/conv-postgres-1$/),
+      expect.objectContaining({
+        method: "DELETE",
+        headers: expect.objectContaining({ Authorization: "Bearer sess_asha" }),
+      }),
+    );
+    const answerBody = JSON.parse(
+      fetchMock.mock.calls.find((call) => String(call[0]).endsWith("/api/answer"))![1]
+        .body,
+    );
+    expect(answerBody.conversation_id).toBe("conv-postgres-1");
+    expect(
+      within(screen.getByRole("complementary")).queryByText("Tell me about theft"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("deletes the account only after confirmation and signs out", async () => {
+    const signOut = vi.fn(async () => undefined);
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const user = userEvent.setup();
+    render(
+      <Shell getToken={async () => "sess_asha"} signOut={signOut} />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /delete account/i }));
+
+    expect(confirm).toHaveBeenCalledWith(expect.stringMatching(/cannot be undone/i));
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringMatching(/\/api\/account$/),
+      expect.objectContaining({
+        method: "DELETE",
+        headers: expect.objectContaining({ Authorization: "Bearer sess_asha" }),
+      }),
+    );
+    expect(signOut).toHaveBeenCalledOnce();
+  });
+
   it("sends prior turns as context so a follow-up builds on the Conversation", async () => {
     render(<Shell />);
     const user = await ask("Someone cheated me by fraud");
@@ -165,7 +230,10 @@ describe("Shell", () => {
     render(<Shell getToken={async () => "sess_asha"} />);
     await ask("What is the punishment for theft?");
 
-    const headers = fetchMock.mock.calls[0][1].headers;
+    const answerCall = fetchMock.mock.calls.find((call) =>
+      String(call[0]).endsWith("/api/answer"),
+    )!;
+    const headers = answerCall[1].headers;
     expect(headers.Authorization).toBe("Bearer sess_asha");
   });
 

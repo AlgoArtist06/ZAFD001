@@ -18,6 +18,7 @@ from rag.accounts import SessionVerifier
 from rag.answer import LegalAssistant
 from rag.privacy import ConsentLedger
 from rag.fastapi_app import create_app
+from rag.store import InMemoryConversationStore
 
 
 def _app(corpus):
@@ -175,3 +176,79 @@ def test_privacy_notice_discloses_third_party_llm(corpus):
     assert "third-party" in body["notice"].lower()
     assert "large language model" in body["notice"].lower()
     assert body["version"]
+
+
+def test_delete_conversation_removes_only_the_signed_in_users_conversation(corpus):
+    verifier = SessionVerifier()
+    consent = ConsentLedger()
+    store = InMemoryConversationStore()
+    ashas = store.create("user-asha", "citizen")
+    ravis = store.create("user-ravi", "citizen")
+    client = TestClient(
+        create_app(
+            LegalAssistant(corpus), verifier=verifier, consent=consent, store=store
+        )
+    )
+    token = verifier.sign_in("user-asha")
+
+    response = client.delete(
+        f"/api/conversations/{ashas.id}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert store.get("user-asha", ashas.id) is None
+    assert store.get("user-ravi", ravis.id) is not None
+
+
+def test_delete_account_erases_the_signed_in_users_data_and_consent(corpus):
+    verifier = SessionVerifier()
+    consent = ConsentLedger()
+    store = InMemoryConversationStore()
+    store.create("user-asha", "citizen")
+    ravis = store.create("user-ravi", "citizen")
+    consent.record("user-asha")
+    consent.record("user-ravi")
+    client = TestClient(
+        create_app(
+            LegalAssistant(corpus), verifier=verifier, consent=consent, store=store
+        )
+    )
+    token = verifier.sign_in("user-asha")
+    client.headers["Authorization"] = f"Bearer {token}"
+
+    response = client.delete("/api/account")
+
+    assert response.status_code == 200
+    assert store.list_for("user-asha") == []
+    assert consent.has_consented("user-asha") is False
+    assert store.get("user-ravi", ravis.id) is not None
+    assert consent.has_consented("user-ravi") is True
+    assert client.post("/api/answer", json={"query": "theft"}).status_code == 401
+
+
+def test_a_deleted_conversation_and_its_turns_cannot_be_reloaded(corpus):
+    verifier = SessionVerifier()
+    consent = ConsentLedger()
+    store = InMemoryConversationStore()
+    client = TestClient(
+        create_app(
+            LegalAssistant(corpus), verifier=verifier, consent=consent, store=store
+        )
+    )
+    token = verifier.sign_in("user-asha")
+    consent.record("user-asha")
+    client.headers["Authorization"] = f"Bearer {token}"
+
+    created = client.post("/api/conversations", json={"mode": "citizen"})
+    conversation_id = created.json()["id"]
+    answered = client.post(
+        "/api/answer",
+        json={"conversation_id": conversation_id, "query": "theft of property"},
+    )
+
+    assert created.status_code == 200
+    assert answered.status_code == 200
+    assert len(client.get(f"/api/conversations/{conversation_id}").json()["turns"]) == 1
+    assert client.delete(f"/api/conversations/{conversation_id}").status_code == 200
+    assert client.get(f"/api/conversations/{conversation_id}").status_code == 404

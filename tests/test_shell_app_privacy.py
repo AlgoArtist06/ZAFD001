@@ -98,5 +98,5 @@ def test_the_whole_account_can_be_erased_over_http(corpus):
     status, _, _ = _call(app, "DELETE", "/api/account", token=token)
     assert status.startswith("200")
 
-    _, _, listing = _call(app, "GET", "/api/conversations", token=token)
-    assert json.loads(listing)["conversations"] == []
+    signed_out, _, _ = _call(app, "GET", "/api/conversations", token=token)
+    assert signed_out.startswith("401")

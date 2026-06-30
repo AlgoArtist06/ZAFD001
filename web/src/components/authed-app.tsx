@@ -9,7 +9,7 @@ import { Shell } from "@/components/shell";
 // is redirected to sign-in. Clerk's session token is threaded into the consent
 // gate and the shell so consent and every question are attributed to that user.
 export function AuthedApp() {
-  const { isLoaded, isSignedIn, getToken } = useAuth();
+  const { isLoaded, isSignedIn, getToken, signOut } = useAuth();
 
   if (!isLoaded) return null;
   if (!isSignedIn) return <RedirectToSignIn />;
@@ -17,7 +17,7 @@ export function AuthedApp() {
   const token = () => getToken();
   return (
     <ConsentGate getToken={token}>
-      <Shell getToken={token} />
+      <Shell getToken={token} signOut={() => signOut()} />
     </ConsentGate>
   );
 }

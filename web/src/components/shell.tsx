@@ -7,6 +7,7 @@ import {
   Scale,
   Shield,
   ShoppingCart,
+  Trash2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -40,7 +41,7 @@ const TOPIC_TILES: { icon: LucideIcon; label: string; prompt: string }[] = [
 // new Conversation; Professional is opted into when the Conversation is started.
 type Mode = "citizen" | "professional";
 
-type Conversation = { id: number; mode: Mode; turns: Turn[] };
+type Conversation = { id: number; mode: Mode; turns: Turn[]; storageId?: string };
 
 // How each Mode reads in the UI - on the selector and the sidebar badge.
 const MODE_LABEL: Record<Mode, string> = {
@@ -81,9 +82,15 @@ function contextOf(conversation: Conversation): string[] {
 // How the shell obtains the signed-in user's session token. The authenticated
 // app passes Clerk's `getToken`; without a session it resolves to null, so the
 // component stays renderable in isolation.
-type ShellProps = { getToken?: () => Promise<string | null> };
+type ShellProps = {
+  getToken?: () => Promise<string | null>;
+  signOut?: () => Promise<void>;
+};
 
-export function Shell({ getToken = async () => null }: ShellProps) {
+export function Shell({
+  getToken = async () => null,
+  signOut = async () => undefined,
+}: ShellProps) {
   const [conversations, setConversations] = useState<Conversation[]>([
     { id: 1, mode: "citizen", turns: [] },
   ]);
@@ -119,6 +126,53 @@ export function Shell({ getToken = async () => null }: ShellProps) {
     setQuestion("");
   }
 
+  async function deleteConversation(conversation: Conversation) {
+    if (!conversation.storageId) {
+      removeConversation(conversation);
+      return;
+    }
+    const token = await getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const response = await fetch(
+      apiUrl(`/api/conversations/${conversation.storageId}`),
+      { method: "DELETE", headers },
+    );
+    if (!response.ok) return;
+
+    removeConversation(conversation);
+  }
+
+  function removeConversation(conversation: Conversation) {
+    const remaining = conversations.filter((item) => item.id !== conversation.id);
+    if (remaining.length) {
+      setConversations(remaining);
+      if (activeId === conversation.id) setActiveId(remaining[0].id);
+    } else {
+      setConversations([{ id: nextId, mode: "citizen", turns: [] }]);
+      setActiveId(nextId);
+      setNextId(nextId + 1);
+    }
+  }
+
+  async function deleteAccount() {
+    if (
+      !window.confirm(
+        "Delete your account and all stored Conversations? This cannot be undone.",
+      )
+    ) {
+      return;
+    }
+    const token = await getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const response = await fetch(apiUrl("/api/account"), {
+      method: "DELETE",
+      headers,
+    });
+    if (response.ok) await signOut();
+  }
+
   async function ask() {
     const query = question.trim();
     if (!query || streaming) return;
@@ -148,10 +202,34 @@ export function Shell({ getToken = async () => null }: ShellProps) {
       };
       if (token) headers.Authorization = `Bearer ${token}`;
 
+      let storageId = active.storageId;
+      if (token && !storageId) {
+        const created = await fetch(apiUrl("/api/conversations"), {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ mode: active.mode }),
+        });
+        if (!created.ok) throw new Error(`Request failed (${created.status})`);
+        storageId = String((await created.json()).id);
+        setConversations((prev) =>
+          prev.map((conversation) =>
+            conversation.id === active.id
+              ? { ...conversation, storageId }
+              : conversation,
+          ),
+        );
+      }
+
       const response = await fetch(apiUrl("/api/answer"), {
         method: "POST",
         headers,
-        body: JSON.stringify({ query, context, mode: active.mode, language }),
+        body: JSON.stringify({
+          query,
+          context,
+          mode: active.mode,
+          language,
+          conversation_id: storageId,
+        }),
       });
       if (!response.ok || !response.body) {
         throw new Error(`Request failed (${response.status})`);
@@ -210,25 +288,43 @@ export function Shell({ getToken = async () => null }: ShellProps) {
           aria-label="Conversation list"
           className="flex max-h-40 flex-col gap-1 overflow-y-auto md:max-h-none"
         >
-          {conversations.map((conversation) => (
-            <button
-              key={conversation.id}
-              type="button"
-              onClick={() => setActiveId(conversation.id)}
-              aria-current={conversation.id === activeId}
-              className={`flex flex-col items-start gap-1 rounded-md px-3 py-2 text-left text-sm hover:bg-muted ${
-                conversation.id === activeId ? "bg-muted font-medium" : ""
-              }`}
-            >
-              <span className="w-full truncate">
-                {conversationTitle(conversation)}
-              </span>
-              <span className="text-muted-foreground rounded border px-1.5 text-xs font-normal">
-                {MODE_LABEL[conversation.mode]}
-              </span>
-            </button>
-          ))}
+          {conversations.map((conversation) => {
+            const title = conversationTitle(conversation);
+            return (
+              <div key={conversation.id} className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setActiveId(conversation.id)}
+                  aria-current={conversation.id === activeId}
+                  className={`min-w-0 flex-1 rounded-md px-3 py-2 text-left text-sm hover:bg-muted ${
+                    conversation.id === activeId ? "bg-muted font-medium" : ""
+                  }`}
+                >
+                  <span className="block truncate">{title}</span>
+                  <span className="text-muted-foreground inline-block rounded border px-1.5 text-xs font-normal">
+                    {MODE_LABEL[conversation.mode]}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Delete Conversation ${title}`}
+                  onClick={() => void deleteConversation(conversation)}
+                  className="hover:bg-muted rounded-md p-2"
+                >
+                  <Trash2 className="size-4" aria-hidden />
+                </button>
+              </div>
+            );
+          })}
         </nav>
+        <Button
+          type="button"
+          variant="destructive"
+          onClick={() => void deleteAccount()}
+          className="mt-auto"
+        >
+          Delete account
+        </Button>
       </aside>
 
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-8 sm:px-6 md:h-screen md:py-12">
