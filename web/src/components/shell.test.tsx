@@ -123,6 +123,38 @@ describe("Shell", () => {
     expect(screen.queryByRole("radiogroup", { name: /answer mode/i })).not.toBeInTheDocument();
   });
 
+  it("routes a question through the multilingual seam in English by default", async () => {
+    render(<Shell />);
+    await ask("What is the punishment for theft?");
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.language).toBe("en");
+  });
+
+  it("offers exactly English, Hindi, Tamil, and Gujarati as answer languages", () => {
+    render(<Shell />);
+
+    const selector = screen.getByRole("combobox", { name: /answer language/i });
+    const options = within(selector)
+      .getAllByRole("option")
+      .map((option) => option.textContent);
+    expect(options).toEqual(["English", "हिन्दी", "தமிழ்", "ગુજરાતી"]);
+  });
+
+  it("passes the chosen language through to the multilingual seam", async () => {
+    const user = userEvent.setup();
+    render(<Shell />);
+
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: /answer language/i }),
+      "hi",
+    );
+    await ask("What is the punishment for theft?");
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.language).toBe("hi");
+  });
+
   it("does not carry memory across when a new Conversation is started", async () => {
     render(<Shell />);
     const user = await ask("Someone cheated me by fraud");

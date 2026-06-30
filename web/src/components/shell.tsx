@@ -22,6 +22,18 @@ const MODE_LABEL: Record<Mode, string> = {
   professional: "Professional",
 };
 
+// The Supported Languages the answer seam reads back in. The code is the
+// `language` parameter passed into the multilingual seam; the label is the
+// language's own endonym, so a reader recognises their language by its script.
+type Language = "en" | "hi" | "ta" | "gu";
+
+const LANGUAGES: { code: Language; label: string }[] = [
+  { code: "en", label: "English" },
+  { code: "hi", label: "हिन्दी" },
+  { code: "ta", label: "தமிழ்" },
+  { code: "gu", label: "ગુજરાતી" },
+];
+
 // The label shown for a Conversation in the sidebar: its first question, or a
 // placeholder while it is still empty.
 function conversationTitle(conversation: Conversation): string {
@@ -50,6 +62,7 @@ export function Shell({ getToken = async () => null }: ShellProps) {
   const [activeId, setActiveId] = useState(1);
   const [nextId, setNextId] = useState(2);
   const [question, setQuestion] = useState("");
+  const [language, setLanguage] = useState<Language>("en");
   const [streaming, setStreaming] = useState(false);
 
   const active = conversations.find((c) => c.id === activeId)!;
@@ -106,7 +119,7 @@ export function Shell({ getToken = async () => null }: ShellProps) {
       const response = await fetch(apiUrl("/api/answer"), {
         method: "POST",
         headers,
-        body: JSON.stringify({ query, context, mode: active.mode }),
+        body: JSON.stringify({ query, context, mode: active.mode, language }),
       });
       if (!response.ok || !response.body) {
         throw new Error(`Request failed (${response.status})`);
@@ -231,6 +244,21 @@ export function Shell({ getToken = async () => null }: ShellProps) {
               ))}
             </fieldset>
           )}
+          <label className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Answer language</span>
+            <select
+              aria-label="Answer language"
+              value={language}
+              onChange={(event) => setLanguage(event.target.value as Language)}
+              className="rounded-md border bg-transparent px-2 py-1"
+            >
+              {LANGUAGES.map(({ code, label }) => (
+                <option key={code} value={code}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
           <Textarea
             value={question}
             onChange={(event) => setQuestion(event.target.value)}

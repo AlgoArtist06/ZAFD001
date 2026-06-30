@@ -1,6 +1,6 @@
 # Language switcher (English, Hindi, Tamil, Gujarati)
 
-Status: ready-for-agent
+Status: done
 
 ## Parent
 
@@ -26,3 +26,11 @@ This slice exposes the multilingual seam that already exists end to end through 
 ## Blocked by
 
 - `12-nextjs-shadcn-scaffold-streaming-answer.md`
+
+## Comments
+
+Exposed the existing multilingual answer seam through the chat shell UI.
+
+- Added an "Answer language" selector to `web/src/components/shell.tsx` offering exactly English, Hindi (हिन्दी), Tamil (தமிழ்), and Gujarati (ગુજરાતી), each labelled by its own endonym/script. The selected language code drives the `language` parameter sent in the `/api/answer` request body (defaulting to `en`).
+- The localized rendering (plain-language explanation in the user's language, Citation and verbatim statutory text staying in authoritative English, and critical legal terms rendered with the English term inline in brackets) is already implemented and tested in the `rag.multilingual` seam that `/api/answer` streams through; this slice is UI-only and adds no new translation pipeline.
+- TDD: three new Shell tests cover defaulting to English, offering exactly the four languages, and passing the chosen language through to the seam. Full web suite (14 tests), eslint, `tsc --noEmit`, and the backend pytest suite all pass.
