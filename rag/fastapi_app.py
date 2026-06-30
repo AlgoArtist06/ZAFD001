@@ -14,9 +14,9 @@ from __future__ import annotations
 
 import glob
 import os
-from typing import List
+from typing import List, Optional
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -25,9 +25,11 @@ from ingestion.chunker import chunk_act
 from ingestion.models import Chunk
 from ingestion.parser import parse_act
 from ingestion.schemes import load_scheme_chunks
+from rag.accounts import Account, SessionVerifier
 from rag.answer import LegalAssistant
 from rag.api import stream_answer
 from rag.followup import rewrite_followup
+from rag.privacy import NOTICE_VERSION, PRIVACY_NOTICE, ConsentLedger
 
 _DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 
@@ -52,25 +54,73 @@ class AnswerRequest(BaseModel):
     context: List[str] = Field(default_factory=list)
 
 
-def create_app(assistant: LegalAssistant) -> FastAPI:
+def _bearer_token(authorization: str) -> str:
+    """The opaque session token from a ``Authorization: Bearer <token>`` header."""
+    scheme, _, token = authorization.partition(" ")
+    return token if scheme.lower() == "bearer" else ""
+
+
+def create_app(
+    assistant: LegalAssistant,
+    verifier: Optional[SessionVerifier] = None,
+    consent: Optional[ConsentLedger] = None,
+) -> FastAPI:
     """Build a FastAPI app bound to a :class:`LegalAssistant`.
 
     The assistant is injected so tests can bind a tiny offline corpus while the
-    demo binds the real Source of Truth.
+    demo binds the real Source of Truth. The session ``verifier`` and the
+    ``consent`` ledger are injected too: every answer is served only to a
+    signed-in user whose session the accounts seam verifies, and only once that
+    user has recorded consent to the privacy notice (their queries are sent to a
+    third-party LLM). Offline they are in-memory stand-ins; production swaps
+    Clerk's hosted verification and a durable ledger behind the same seams.
     """
     app = FastAPI(title="Multilingual Legal Awareness Assistant")
+    verifier = verifier or SessionVerifier()
+    consent = consent or ConsentLedger()
 
     # The Next.js dev server runs on a different origin, so allow cross-origin
     # calls to the demo endpoint.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
-        allow_methods=["POST"],
+        allow_methods=["GET", "POST"],
         allow_headers=["*"],
     )
 
+    def current_account(authorization: str = Header(default="")) -> Account:
+        """Resolve the signed-in Account from the session the browser carries.
+
+        This is the backend's gate: an answer is never served to a request whose
+        session the accounts seam cannot verify, so an unauthenticated or unknown
+        token is rejected before any work is done.
+        """
+        account = verifier.verify(_bearer_token(authorization))
+        if account is None:
+            raise HTTPException(status_code=401, detail="Sign in to use the assistant.")
+        return account
+
+    @app.get("/api/privacy-notice")
+    def privacy_notice() -> dict:
+        """The notice shown at signup, including the third-party-LLM disclosure."""
+        return {"version": NOTICE_VERSION, "notice": PRIVACY_NOTICE}
+
+    @app.post("/api/consent")
+    def give_consent(account: Account = Depends(current_account)) -> dict:
+        """Record, server-side, the signed-in user's consent to the notice."""
+        record = consent.record(account.user_id)
+        return {"user_id": record.user_id, "notice_version": record.notice_version}
+
     @app.post("/api/answer")
-    def answer(request: AnswerRequest) -> StreamingResponse:
+    def answer(
+        request: AnswerRequest, account: Account = Depends(current_account)
+    ) -> StreamingResponse:
+        # The request is attributed to the verified user; an answer is served
+        # only once that user has consented to the third-party-LLM processing.
+        if not consent.has_consented(account.user_id):
+            raise HTTPException(
+                status_code=403, detail="Consent to the privacy notice is required."
+            )
         # Resolve a dependent follow-up against the Conversation's recent turns
         # before retrieval, routing through the same memory seam the in-process
         # Conversation uses; a self-contained query is returned unchanged.
