@@ -58,7 +58,7 @@ while true; do
             echo "Exit code: $STATUS"
             echo
             echo "Common causes:"
-            echo "  - Claude finished without committing (it printed the leftover"
+            echo "  - The coding agent finished without committing (it printed the leftover"
             echo "    files above); recover or discard them before re-running."
             echo "  - The working tree was already dirty at the start of the run."
             echo

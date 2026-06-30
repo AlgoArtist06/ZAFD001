@@ -18,6 +18,7 @@ set -euo pipefail
 
 READY_STATUS="ready-for-agent"
 DONE_STATUS="done"
+RALPH_AGENT="${RALPH_AGENT:-claude}"
 
 # -----------------------------
 # Ensure git repository exists
@@ -52,7 +53,7 @@ fi
 # -----------------------------
 # Working tree must be clean
 #
-# Use porcelain so UNTRACKED files also count as dirty. A killed Claude
+# Use porcelain so UNTRACKED files also count as dirty. A killed coding-agent
 # session can leave new (uncommitted, untracked) source files behind;
 # `git diff` ignores those, which let leftover state silently leak into
 # the next iteration. Porcelain respects .gitignore, so build caches
@@ -134,18 +135,32 @@ EOF
 )
 
 # -----------------------------
-# Launch Claude
+# Launch the selected coding agent
 # -----------------------------
-claude -p --verbose --dangerously-skip-permissions "$PROMPT"
+case "$RALPH_AGENT" in
+    claude)
+        claude -p --verbose --dangerously-skip-permissions "$PROMPT"
+        ;;
+    codex)
+        codex exec \
+            --dangerously-bypass-approvals-and-sandbox \
+            --cd "$PWD" \
+            "$PROMPT"
+        ;;
+    *)
+        echo "Unsupported RALPH_AGENT: $RALPH_AGENT"
+        exit 1
+        ;;
+esac
 
 # -----------------------------
-# Verify Claude committed
+# Verify the coding agent committed
 # -----------------------------
 NEW_COMMIT=$(git rev-parse HEAD)
 
 if [ "$OLD_COMMIT" = "$NEW_COMMIT" ]; then
     echo
-    echo "Claude did not create a commit for:"
+    echo "$RALPH_AGENT did not create a commit for:"
     echo "  $ISSUE_FILE"
     echo
     echo "Any work it left behind is uncommitted and shown below."
@@ -157,7 +172,7 @@ if [ "$OLD_COMMIT" = "$NEW_COMMIT" ]; then
 fi
 
 # -----------------------------
-# Ensure the issue is marked done (fallback if Claude forgot).
+# Ensure the issue is marked done (fallback if the coding agent forgot).
 # Guarantees the loop makes progress and never re-picks this issue.
 # -----------------------------
 if grep -qiE "^Status:[[:space:]]*${READY_STATUS}[[:space:]]*$" "$ISSUE_FILE"; then
