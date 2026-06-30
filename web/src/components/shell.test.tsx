@@ -4,25 +4,43 @@ import userEvent from "@testing-library/user-event";
 
 import { Shell } from "@/components/shell";
 
-// A fetch double whose response body streams the given chunks back, so the
-// shell can be exercised against a streaming answer without a live backend.
-function streamingResponse(chunks: string[]) {
+// A fetch double whose response body streams the given structured frames back as
+// NDJSON, so the shell can be exercised against the answer seam's signals
+// (explanation, citation, disclaimer, refusal, high-stakes) without a backend.
+function streamingResponse(frames: object[]) {
   const encoder = new TextEncoder();
   const body = new ReadableStream<Uint8Array>({
     start(controller) {
-      for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+      for (const frame of frames) {
+        controller.enqueue(encoder.encode(JSON.stringify(frame) + "\n"));
+      }
       controller.close();
     },
   });
   return { ok: true, body } as unknown as Response;
 }
 
+// The frames a normal grounded answer streams: a plain-language explanation, a
+// verbatim-English citation, and the disclaimer with its legal-aid pointer.
+const GROUNDED_FRAMES = [
+  { kind: "meta", state: "normal" },
+  { kind: "explanation", text: "The law says X." },
+  {
+    kind: "citation",
+    reference: "Bharatiya Nyaya Sanhita (2023), Section 303",
+    verbatim: "Whoever commits theft shall be punished.",
+    url: "https://example.gov.in/bns/303",
+  },
+  {
+    kind: "disclaimer",
+    text: "This is legal information, not legal advice. Consult a lawyer or your nearest Legal Services Authority (NALSA / DLSA).",
+  },
+];
+
 let fetchMock: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
-  fetchMock = vi.fn(async () =>
-    streamingResponse(["The law says X.\n\n", "Legal basis: Section 303."]),
-  );
+  fetchMock = vi.fn(async () => streamingResponse(GROUNDED_FRAMES));
   vi.stubGlobal("fetch", fetchMock);
 });
 
@@ -45,7 +63,75 @@ describe("Shell", () => {
     const thread = screen.getByRole("log");
     expect(within(thread).getByText("What is the punishment for theft?")).toBeInTheDocument();
     expect(await within(thread).findByText(/The law says X\./)).toBeInTheDocument();
-    expect(within(thread).getByText(/Legal basis: Section 303\./)).toBeInTheDocument();
+    // The cited statutory text arrives in its own distinct, verbatim-English block.
+    const basis = within(thread).getByRole("region", { name: /legal basis/i });
+    expect(within(basis).getByText(/Whoever commits theft/)).toBeInTheDocument();
+  });
+
+  it("renders an out-of-scope query as a graceful refusal, never a fabricated citation", async () => {
+    fetchMock.mockResolvedValueOnce(
+      streamingResponse([
+        { kind: "meta", state: "refusal" },
+        { kind: "explanation", text: "I do not have a sourced answer for that" },
+        {
+          kind: "disclaimer",
+          text: "This is legal information, not legal advice. Consult a lawyer or your nearest Legal Services Authority (NALSA / DLSA).",
+        },
+      ]),
+    );
+    render(<Shell />);
+    await ask("best recipe for biryani");
+
+    const thread = screen.getByRole("log");
+    expect(
+      await within(thread).findByText(/I do not have a sourced answer for that/),
+    ).toBeInTheDocument();
+    expect(
+      within(thread).queryByRole("region", { name: /legal basis/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("leads a high-stakes answer with emergency contacts before the legal content", async () => {
+    fetchMock.mockResolvedValueOnce(
+      streamingResponse([
+        { kind: "meta", state: "emergency" },
+        {
+          kind: "highStakesNotice",
+          text: "If you are in immediate danger, get help first:\n- Emergency: 112\n- Women's helpline: 181",
+        },
+        { kind: "explanation", text: "The law says X." },
+        {
+          kind: "citation",
+          reference: "Bharatiya Nyaya Sanhita (2023), Section 303",
+          verbatim: "Whoever commits theft shall be punished.",
+          url: "https://example.gov.in/bns/303",
+        },
+      ]),
+    );
+    render(<Shell />);
+    await ask("I was just arrested, what are my rights?");
+
+    const thread = screen.getByRole("log");
+    const emergency = await within(thread).findByRole("alert");
+    expect(within(emergency).getByText(/112/)).toBeInTheDocument();
+    const basis = within(thread).getByRole("region", { name: /legal basis/i });
+    expect(
+      emergency.compareDocumentPosition(basis) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("offers icon-led category tiles for common topics that prefill a question", async () => {
+    const user = userEvent.setup();
+    render(<Shell />);
+
+    const tiles = screen.getByRole("group", { name: /common topics/i });
+    expect(within(tiles).getByRole("button", { name: /consumer/i })).toBeInTheDocument();
+    expect(within(tiles).getByRole("button", { name: /police|arrest/i })).toBeInTheDocument();
+
+    await user.click(within(tiles).getByRole("button", { name: /consumer/i }));
+    const input = screen.getByLabelText(/your legal question/i) as HTMLTextAreaElement;
+    expect(input.value).toMatch(/consumer/i);
   });
 
   it("starts a fresh, empty conversation when the new-chat action is used", async () => {

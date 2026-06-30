@@ -1,14 +1,40 @@
 "use client";
 
 import { useState } from "react";
+import {
+  Landmark,
+  Lightbulb,
+  Scale,
+  Shield,
+  ShoppingCart,
+  type LucideIcon,
+} from "lucide-react";
 
+import {
+  AnswerView,
+  emptyAnswer,
+  type StructuredAnswer,
+} from "@/components/answer-view";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { apiUrl } from "@/lib/api";
 
-type Role = "user" | "assistant";
+// A turn is either the user's question (plain text) or the assistant's Grounded
+// Answer, rendered in its structured, safe form from the seam's signals.
+type Turn =
+  | { role: "user"; text: string }
+  | { role: "assistant"; answer: StructuredAnswer };
 
-type Turn = { role: Role; text: string };
+// The icon-led tiles for the common legal topics the assistant covers. Each
+// prefills a plain-language starter question so a low-literacy user can begin
+// without typing. The set mirrors the PRD's Covered Domains.
+const TOPIC_TILES: { icon: LucideIcon; label: string; prompt: string }[] = [
+  { icon: ShoppingCart, label: "Consumer rights", prompt: "What are my consumer rights if a shop cheated me?" },
+  { icon: Shield, label: "Police & arrest", prompt: "What are my rights during a police interaction or arrest?" },
+  { icon: Landmark, label: "Fundamental rights", prompt: "What are my fundamental rights?" },
+  { icon: Scale, label: "Criminal law", prompt: "What does the law say about theft of property?" },
+  { icon: Lightbulb, label: "Government schemes", prompt: "Which government scheme can help me, and how do I apply?" },
+];
 
 // The two answering profiles of the dual-mode seam. Citizen is the default for a
 // new Conversation; Professional is opted into when the Conversation is started.
@@ -37,8 +63,10 @@ const LANGUAGES: { code: Language; label: string }[] = [
 // The label shown for a Conversation in the sidebar: its first question, or a
 // placeholder while it is still empty.
 function conversationTitle(conversation: Conversation): string {
-  const firstUser = conversation.turns.find((turn) => turn.role === "user");
-  return firstUser ? firstUser.text : "New chat";
+  for (const turn of conversation.turns) {
+    if (turn.role === "user") return turn.text;
+  }
+  return "New chat";
 }
 
 // The prior user turns of a Conversation, oldest first - the context the answer
@@ -46,7 +74,7 @@ function conversationTitle(conversation: Conversation): string {
 // nothing carries across from a previous one.
 function contextOf(conversation: Conversation): string[] {
   return conversation.turns
-    .filter((turn) => turn.role === "user")
+    .filter((turn): turn is Extract<Turn, { role: "user" }> => turn.role === "user")
     .map((turn) => turn.text);
 }
 
@@ -104,8 +132,12 @@ export function Shell({ getToken = async () => null }: ShellProps) {
     updateActive((turns) => [
       ...turns,
       { role: "user", text: query },
-      { role: "assistant", text: "" },
+      { role: "assistant", answer: emptyAnswer() },
     ]);
+
+    function applyToActiveAnswer(apply: (answer: StructuredAnswer) => StructuredAnswer) {
+      updateActive((turns) => mapLastAssistant(turns, apply));
+    }
 
     try {
       // The session token attributes this request to the signed-in user, so the
@@ -124,21 +156,39 @@ export function Shell({ getToken = async () => null }: ShellProps) {
       if (!response.ok || !response.body) {
         throw new Error(`Request failed (${response.status})`);
       }
+      // The seam streams its structured signals as NDJSON, one part per line, so
+      // each part is rendered safely in place as it arrives rather than parsed
+      // out of a flat blob. Lines are buffered until newline-complete.
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
+      let buffer = "";
+      const drain = (final: boolean) => {
+        let newline = buffer.indexOf("\n");
+        while (newline !== -1) {
+          const line = buffer.slice(0, newline);
+          buffer = buffer.slice(newline + 1);
+          if (line.trim()) applyToActiveAnswer((a) => applyFrame(a, line));
+          newline = buffer.indexOf("\n");
+        }
+        if (final && buffer.trim()) {
+          applyToActiveAnswer((a) => applyFrame(a, buffer));
+          buffer = "";
+        }
+      };
       for (;;) {
         const { value, done } = await reader.read();
         if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        updateActive((turns) => appendToLastAssistant(turns, chunk));
+        buffer += decoder.decode(value, { stream: true });
+        drain(false);
       }
+      drain(true);
     } catch {
-      updateActive((turns) =>
-        appendToLastAssistant(
-          turns,
+      applyToActiveAnswer((answer) => ({
+        ...answer,
+        state: "refusal",
+        explanation:
           "Something went wrong reaching the assistant. Is the backend running?",
-        ),
-      );
+      }));
     } finally {
       setStreaming(false);
     }
@@ -190,25 +240,46 @@ export function Shell({ getToken = async () => null }: ShellProps) {
         >
           {active.turns.length === 0 && (
             <div className="text-muted-foreground mt-[8vh] text-center">
-              <p className="text-foreground text-xl font-semibold">
+              <p className="text-foreground text-2xl font-semibold">
                 What do you want to understand?
               </p>
-              <p className="mt-2 text-base">
+              <p className="mt-2 text-lg">
                 Ask about your rights in plain language. Every answer is grounded
                 in a cited legal source.
               </p>
+              <div
+                role="group"
+                aria-label="Common topics"
+                className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3"
+              >
+                {TOPIC_TILES.map(({ icon: Icon, label, prompt }) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => setQuestion(prompt)}
+                    className="hover:bg-muted flex flex-col items-center gap-2 rounded-lg border p-4 text-center"
+                  >
+                    <Icon className="text-primary size-7 shrink-0" aria-hidden />
+                    <span className="text-foreground text-base font-medium">
+                      {label}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
-          {active.turns.map((turn, index) => (
-            <div
-              key={index}
-              className={`max-w-full rounded-lg border p-4 text-base leading-7 whitespace-pre-wrap ${
-                turn.role === "user" ? "bg-muted self-end" : "bg-muted/40"
-              }`}
-            >
-              {turn.text}
-            </div>
-          ))}
+          {active.turns.map((turn, index) =>
+            turn.role === "user" ? (
+              <div
+                key={index}
+                className="bg-muted max-w-full self-end rounded-lg border p-4 text-lg leading-8 whitespace-pre-wrap"
+              >
+                {turn.text}
+              </div>
+            ) : (
+              <AnswerView key={index} answer={turn.answer} />
+            ),
+          )}
         </section>
 
         <form
@@ -282,11 +353,57 @@ export function Shell({ getToken = async () => null }: ShellProps) {
   );
 }
 
-function appendToLastAssistant(turns: Turn[], chunk: string): Turn[] {
+// Apply a structured-answer update to the Conversation's latest assistant turn,
+// which is the one currently streaming its parts in.
+function mapLastAssistant(
+  turns: Turn[],
+  apply: (answer: StructuredAnswer) => StructuredAnswer,
+): Turn[] {
   const next = [...turns];
   const last = next[next.length - 1];
   if (last && last.role === "assistant") {
-    next[next.length - 1] = { ...last, text: last.text + chunk };
+    next[next.length - 1] = { role: "assistant", answer: apply(last.answer) };
   }
   return next;
+}
+
+// One NDJSON frame from the answer seam, folded into the structured answer as it
+// arrives. An unrecognised or malformed frame is ignored, so a partial line
+// never corrupts what is already rendered.
+function applyFrame(answer: StructuredAnswer, line: string): StructuredAnswer {
+  let frame: Record<string, unknown>;
+  try {
+    frame = JSON.parse(line) as Record<string, unknown>;
+  } catch {
+    return answer;
+  }
+  const text = typeof frame.text === "string" ? frame.text : "";
+  switch (frame.kind) {
+    case "meta":
+      return { ...answer, state: frame.state as StructuredAnswer["state"] };
+    case "highStakesNotice":
+      return { ...answer, highStakesNotice: text };
+    case "explanation":
+      return { ...answer, explanation: text };
+    case "citation":
+      return {
+        ...answer,
+        citations: [
+          ...answer.citations,
+          {
+            reference: String(frame.reference ?? ""),
+            verbatim: String(frame.verbatim ?? ""),
+            url: String(frame.url ?? ""),
+          },
+        ],
+      };
+    case "note":
+      return { ...answer, note: text };
+    case "nextStep":
+      return { ...answer, nextStep: text };
+    case "disclaimer":
+      return { ...answer, disclaimer: text };
+    default:
+      return answer;
+  }
 }

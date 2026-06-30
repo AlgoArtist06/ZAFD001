@@ -3,18 +3,21 @@
 This replaces the ad-hoc stdlib WSGI demo (:mod:`rag.api`'s ``build_app``) with
 the framework the PRD's technology stack calls for. It is a wrapper only:
 
-    POST /api/answer  -> streams a Grounded Answer back as text/plain chunks
+    POST /api/answer  -> streams a Grounded Answer back as NDJSON frames
 
 Every part of retrieval, grounding, citation verification, and guardrails stays
 in the existing ``rag`` seam. This module only adapts that seam to HTTP and
-streams its structured output one part at a time, so a citizen watches a sourced
-answer arrive rather than waiting for a single blob.
+streams its structured signals one part at a time - one JSON frame per line, each
+tagging its kind (state, high-stakes notice, explanation, citation, next step,
+disclaimer) - so the frontend renders a sourced answer in its safe, distinct
+form as it arrives rather than parsing a flat blob.
 """
 from __future__ import annotations
 
 import glob
+import json
 import os
-from typing import List, Optional
+from typing import Iterator, List, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,8 +29,7 @@ from ingestion.models import Chunk
 from ingestion.parser import parse_act
 from ingestion.schemes import load_scheme_chunks
 from rag.accounts import Account, SessionVerifier
-from rag.answer import LegalAssistant
-from rag.api import stream_answer
+from rag.answer import GroundedAnswer, LegalAssistant
 from rag.followup import rewrite_followup
 from rag.privacy import NOTICE_VERSION, PRIVACY_NOTICE, ConsentLedger
 
@@ -37,6 +39,49 @@ _DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 # Conversation._CONTEXT_TURNS so this stateless path remembers exactly as much
 # as the in-process and persisted ones.
 _CONTEXT_TURNS = 4
+
+
+def _answer_frames(result: GroundedAnswer) -> Iterator[str]:
+    """Stream a Grounded Answer as NDJSON frames, one structured part per line.
+
+    The frontend renders each signal the answer seam decided - the high-stakes
+    notice, the plain-language explanation, each verbatim-English Citation, the
+    practical next step, and the disclaimer with its legal-aid pointer - in its
+    own safe, distinct presentation. The ``meta`` frame leads with the answer's
+    state so a refusal, an emergency answer, and a normal answer are each
+    rendered distinguishably. This is presentation only: every decision (what is
+    refused, what is high-stakes, what is cited) stays in the seam.
+    """
+
+    def frame(payload: dict) -> str:
+        return json.dumps(payload, ensure_ascii=False) + "\n"
+
+    state = (
+        "refusal"
+        if result.refused
+        else "emergency"
+        if result.high_stakes
+        else "normal"
+    )
+    yield frame({"kind": "meta", "state": state})
+    if result.high_stakes_notice:
+        yield frame({"kind": "highStakesNotice", "text": result.high_stakes_notice})
+    yield frame({"kind": "explanation", "text": result.explanation})
+    for citation in result.citations:
+        yield frame(
+            {
+                "kind": "citation",
+                "reference": citation.reference,
+                "verbatim": citation.verbatim_text,
+                "url": citation.source_url,
+            }
+        )
+    if result.former_ipc_note:
+        yield frame({"kind": "note", "text": result.former_ipc_note})
+    if result.next_step:
+        yield frame({"kind": "nextStep", "text": result.next_step})
+    if result.disclaimer:
+        yield frame({"kind": "disclaimer", "text": result.disclaimer})
 
 
 class AnswerRequest(BaseModel):
@@ -125,10 +170,11 @@ def create_app(
         # before retrieval, routing through the same memory seam the in-process
         # Conversation uses; a self-contained query is returned unchanged.
         resolved = rewrite_followup(request.query, request.context[-_CONTEXT_TURNS:])
-        parts = stream_answer(
-            assistant, resolved, request.mode, request.language
+        result = assistant.answer(resolved, mode=request.mode, language=request.language)
+        return StreamingResponse(
+            _answer_frames(result),
+            media_type="application/x-ndjson; charset=utf-8",
         )
-        return StreamingResponse(parts, media_type="text/plain; charset=utf-8")
 
     return app
 

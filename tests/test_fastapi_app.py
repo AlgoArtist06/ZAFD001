@@ -10,6 +10,8 @@ Clerk-authenticated browser carries is verified through the accounts seam before
 anything is answered, and the request is attributed to that user, so one user's
 session can never stand in for another's.
 """
+import json
+
 from fastapi.testclient import TestClient
 
 from rag.accounts import SessionVerifier
@@ -56,10 +58,18 @@ def test_unknown_session_is_rejected(corpus):
 def test_post_streams_a_grounded_answer_with_verbatim_basis(corpus):
     response = _client(corpus).post("/api/answer", json={"query": "theft of property"})
     assert response.status_code == 200
-    body = response.text
-    # The streamed explanation and the verbatim cited legal basis both arrive.
-    assert "Legal basis" in body
-    assert "commits theft" in body
+    frames = [json.loads(line) for line in response.text.splitlines() if line.strip()]
+    kinds = [frame["kind"] for frame in frames]
+    # The structured signals reach the wire: a state, the plain-language
+    # explanation, a distinct Citation carrying the verbatim English text, and the
+    # disclaimer with its legal-aid pointer on every answer.
+    assert kinds[0] == "meta" and frames[0]["state"] == "normal"
+    assert "explanation" in kinds
+    citation = next(frame for frame in frames if frame["kind"] == "citation")
+    assert "commits theft" in citation["verbatim"]
+    assert "Section" in citation["reference"]
+    disclaimer = next(frame for frame in frames if frame["kind"] == "disclaimer")
+    assert "NALSA / DLSA" in disclaimer["text"]
 
 
 def test_post_streams_rather_than_buffering_a_blob(corpus):
