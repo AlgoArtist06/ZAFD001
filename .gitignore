@@ -4,6 +4,8 @@ __pycache__/
 .mypy_cache/
 *.egg-info/
 .env
+.venv/
+venv/
 
 # Stray Node tooling caches if a JS tool is run from the repo root instead of web/
 node_modules/

@@ -1,6 +1,6 @@
 # Clerk authentication and consent at signup
 
-Status: ready-for-agent
+Status: done
 
 ## Parent
 
@@ -27,3 +27,32 @@ Durable storage of those Conversations is the next slice; here the requirement i
 ## Blocked by
 
 - `13-chatgpt-shell-layout-sidebar.md`
+
+## Comments
+
+Built test-first (red -> green -> refactor) on the existing seams; the backend
+auth/consent/notice contract in `rag/fastapi_app.py` was already in place and
+tested, so this slice is the Next.js wiring that puts real accounts in front of
+it.
+
+- `ClerkProvider` wraps the app in `layout.tsx`, and a Next.js 16 `proxy.ts`
+  (Clerk middleware) protects every route except the Clerk-hosted `/sign-in`
+  and `/sign-up` pages, so an unauthenticated visitor never reaches the shell.
+- `page.tsx` now renders `AuthedApp`, a client gate that redirects an
+  unauthenticated user to sign-in and otherwise threads Clerk's `getToken` into
+  the consent gate and the shell.
+- `ConsentGate` fetches the DPDP privacy notice from `/api/privacy-notice`
+  (third-party-LLM disclosure and trade-off), blocks the shell until the user
+  explicitly opts in, then records consent server-side via
+  `POST /api/consent` carrying the user's `Authorization: Bearer` token.
+- `Shell` attaches the signed-in user's Clerk token on every `POST /api/answer`,
+  so the existing accounts seam verifies the session and attributes the request
+  to that user - no cross-user leakage. A new `lib/api.ts` centralises the
+  backend base URL the shell, notice, and consent calls share.
+- Clerk config keys are already present as placeholders in the repo-root
+  `.env.example`; no new real secret was committed. `.venv/` was added to
+  `.gitignore` (used only to run the backend suite locally).
+
+Verified: web `vitest` (7 passing, incl. new auth-token and consent-gate tests),
+`eslint` clean, `tsc --noEmit` clean, `next build` succeeds with the proxy and
+Clerk routes, and the full backend `pytest` suite stays green.

@@ -75,6 +75,14 @@ describe("Shell", () => {
     expect(followupBody.context).toEqual(["Someone cheated me by fraud"]);
   });
 
+  it("attributes the request to the signed-in user by sending their Bearer token", async () => {
+    render(<Shell getToken={async () => "sess_asha"} />);
+    await ask("What is the punishment for theft?");
+
+    const headers = fetchMock.mock.calls[0][1].headers;
+    expect(headers.Authorization).toBe("Bearer sess_asha");
+  });
+
   it("does not carry memory across when a new Conversation is started", async () => {
     render(<Shell />);
     const user = await ask("Someone cheated me by fraud");

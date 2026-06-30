@@ -1,7 +1,7 @@
-import { Shell } from "@/components/shell";
+import { AuthedApp } from "@/components/authed-app";
 
-// The ChatGPT-style shell: a sidebar of Conversations beside a central chat
-// thread that streams each Grounded Answer in place.
+// The chat shell lives behind authentication: a signed-in, consented user gets
+// the sidebar-and-thread shell; everyone else is sent to sign-in first.
 export default function Home() {
-  return <Shell />;
+  return <AuthedApp />;
 }

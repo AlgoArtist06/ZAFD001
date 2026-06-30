@@ -4,9 +4,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/answer";
+import { apiUrl } from "@/lib/api";
 
 type Role = "user" | "assistant";
 
@@ -30,7 +28,12 @@ function contextOf(conversation: Conversation): string[] {
     .map((turn) => turn.text);
 }
 
-export function Shell() {
+// How the shell obtains the signed-in user's session token. The authenticated
+// app passes Clerk's `getToken`; without a session it resolves to null, so the
+// component stays renderable in isolation.
+type ShellProps = { getToken?: () => Promise<string | null> };
+
+export function Shell({ getToken = async () => null }: ShellProps) {
   const [conversations, setConversations] = useState<Conversation[]>([
     { id: 1, turns: [] },
   ]);
@@ -72,9 +75,17 @@ export function Shell() {
     ]);
 
     try {
-      const response = await fetch(API_URL, {
+      // The session token attributes this request to the signed-in user, so the
+      // backend scopes the Conversation to them and never to another user.
+      const token = await getToken();
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (token) headers.Authorization = `Bearer ${token}`;
+
+      const response = await fetch(apiUrl("/api/answer"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ query, context }),
       });
       if (!response.ok || !response.body) {
