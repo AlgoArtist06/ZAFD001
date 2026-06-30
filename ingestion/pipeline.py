@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Set, Union
 
+from config import AppConfig, load_config
 from ingestion.chunker import chunk_act
 from ingestion.coverage import CoverageReport, build_coverage_report
 from ingestion.landmarks import LandmarkJudgment, load_landmark_judgments
@@ -21,7 +22,7 @@ from ingestion.models import Chunk
 from ingestion.parser import parse_act
 from ingestion.schemes import load_scheme_chunks
 from ingestion.validation import ValidationReport, validate_chunks
-from ingestion.vectorstore import DeterministicEmbedder, InMemoryVectorStore
+from ingestion.vectorstore import InMemoryVectorStore
 
 _DATA = Path(__file__).resolve().parent.parent / "data"
 
@@ -69,7 +70,9 @@ def _ingested_by_act(chunks: List[Chunk]) -> Dict[str, Set[str]]:
     return by_act
 
 
-def run_ingestion(config: IngestionConfig) -> IngestionResult:
+def run_ingestion(
+    config: IngestionConfig, app_config: AppConfig | None = None
+) -> IngestionResult:
     # 1. Parse + adaptively chunk every in-scope act.
     all_chunks: List[Chunk] = []
     for source in sorted(Path(config.sources_dir).glob("*.txt")):
@@ -83,7 +86,9 @@ def run_ingestion(config: IngestionConfig) -> IngestionResult:
     validation = validate_chunks(all_chunks)
 
     # 4. Embed + load (no-provenance-no-answer: only validated chunks reach the store).
-    store = InMemoryVectorStore(DeterministicEmbedder(dim=config.embedding_dim))
+    settings = app_config or load_config()
+    embedder = settings.create_embedder(dim=config.embedding_dim)
+    store = settings.create_vector_store(embedder)
     store.load(validation.loadable)
 
     # 5. IPC-BNS mapping, verified against the official correspondence chart.

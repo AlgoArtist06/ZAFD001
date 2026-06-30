@@ -3,9 +3,9 @@
 Generation runs under a hard contract: answer only from retrieved Source of
 Truth text, attach a Citation to every claim, and never invent a section. The
 default :class:`DeterministicGenerator` is offline and template-based so the
-suite needs no LLM; production swaps in a Claude-backed generator (claude-opus)
-behind the same :class:`Generator` protocol, exactly as the vector store swaps a
-real embedder behind :class:`Embedder`.
+suite needs no LLM; production swaps in Google Gemini 2.5 Flash via its
+OpenAI-compatible endpoint behind the same :class:`Generator` protocol, exactly
+as the vector store swaps a real embedder behind :class:`Embedder`.
 """
 from __future__ import annotations
 

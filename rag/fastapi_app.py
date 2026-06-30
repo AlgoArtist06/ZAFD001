@@ -19,6 +19,7 @@ import json
 import os
 from typing import Any, Iterator, List, Optional
 
+from config import load_config
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -263,6 +264,12 @@ def build_demo_app() -> FastAPI:
 
     Run with ``uvicorn rag.fastapi_app:build_demo_app --factory``.
     """
-    dsn = os.environ.get("DATABASE_URL")
-    store = PostgresConversationStore.from_dsn(dsn) if dsn else None
-    return create_app(LegalAssistant(load_demo_corpus()), store=store)
+    config = load_config()
+    store = (
+        PostgresConversationStore.from_dsn(config.database_url)
+        if config.database_url
+        else None
+    )
+    return create_app(
+        LegalAssistant(load_demo_corpus(), app_config=config), store=store
+    )

@@ -15,6 +15,7 @@ import os
 from dataclasses import dataclass, field
 from typing import List, Optional, Sequence
 
+from config import AppConfig, load_config
 from ingestion.mapping import IpcBnsMapping, MappingEntry, load_ipc_bns_mapping
 from ingestion.models import Chunk
 from ingestion.vectorstore import Embedder
@@ -22,7 +23,7 @@ from rag.citation import Citation
 from rag.domain import route_domains
 from rag.expansion import expand
 from rag.followup import rewrite_followup
-from rag.generation import DeterministicGenerator, Generator, _DISCLAIMER
+from rag.generation import Generator, _DISCLAIMER
 from rag.guardrails import (
     ADVICE_REFUSAL_NEXT_STEP,
     ADVICE_REFUSAL_TEXT,
@@ -151,15 +152,19 @@ class LegalAssistant:
         generator: Optional[Generator] = None,
         mapping: Optional[IpcBnsMapping] = None,
         glossary: Optional[BilingualGlossary] = None,
+        app_config: Optional[AppConfig] = None,
     ):
+        settings = app_config or load_config()
         # No provenance, no answer: only loadable chunks enter the index.
         self._corpus = [c for c in chunks if c.is_loadable()]
-        self._retriever = HybridRetriever(self._corpus, embedder=embedder)
+        self._retriever = HybridRetriever(
+            self._corpus, embedder=embedder, app_config=settings
+        )
         # The Bilingual Legal Glossary normalises an incoming query to English and
         # constrains the terminology of the answer; the same instance backs the
         # generator so both directions agree on terms.
         self._glossary = glossary or BilingualGlossary.load()
-        self._generator = generator or DeterministicGenerator(self._glossary)
+        self._generator = generator or settings.create_generator(self._glossary)
         # The IPC-to-BNS Mapping normalises old IPC numbers on input and
         # annotates them on output; it is never added to the retrieval corpus.
         self._mapping = mapping or load_ipc_bns_mapping(_DEFAULT_MAPPING_PATH)
