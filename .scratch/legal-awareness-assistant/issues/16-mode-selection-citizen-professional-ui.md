@@ -1,6 +1,6 @@
 # Mode selection (Citizen / Professional) in the UI
 
-Status: ready-for-agent
+Status: done
 
 ## Parent
 
@@ -27,3 +27,15 @@ This slice wires the UI to the dual-mode seam that already exists; it does not c
 ## Blocked by
 
 - `13-chatgpt-shell-layout-sidebar.md`
+
+## Comments
+
+Wired the dual-mode seam into the chat shell (`web/src/components/shell.tsx`), TDD red-green-refactor.
+
+- Each `Conversation` now carries a locked `mode` (`citizen` | `professional`), defaulting to Citizen for new chats and for the `+ New chat` action.
+- An "Answer mode" radio group is shown only while the active Conversation is empty; once the first message is sent the selector disappears, so the mode cannot change mid-Conversation. Switching profiles means starting a new chat.
+- Each sidebar entry shows its mode as a small badge.
+- `ask()` sends the Conversation's locked `mode` in the `/api/answer` body, routing through the existing FastAPI dual-mode seam (which already accepts `mode`); Professional yields the terser citation-dense style, Citizen the plain-language style. No retrieval/generation behavior changed here.
+- The locked mode lives on the in-memory Conversation alongside its turns, so it rides along when frontend persistence lands.
+
+Added shell tests for: default Citizen routing, Professional routing when chosen, the sidebar badge, and the mode lock once a message exists. All 11 web tests, lint, `tsc --noEmit`, and the 215 Python tests pass.
