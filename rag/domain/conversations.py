@@ -19,6 +19,7 @@ read, so they never sit in storage in the clear.
 from __future__ import annotations
 
 import itertools
+import json
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
@@ -28,12 +29,18 @@ from rag.domain.privacy import Cipher
 @dataclass
 class Turn:
     """One exchange in a Conversation: the user's words, the standalone query
-    they resolved to (for in-Conversation follow-up memory), and the answer."""
+    they resolved to (for in-Conversation follow-up memory), and the answer.
+
+    ``citations`` carries the verified Citations of the answer in their wire
+    form (``reference``, ``verbatim``, ``url``), so a reloaded Conversation
+    shows the same verbatim statutory text the live answer streamed.
+    """
 
     query: str
     resolved: str
     answer: str
     refused: bool
+    citations: List[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -128,11 +135,14 @@ class InMemoryConversationStore:
             del self._by_id[conversation_id]
 
     def _encrypt_turn(self, turn: Turn) -> Turn:
+        # Citations are one encrypted JSON blob at rest, like the other content
+        # fields; the field holds the ciphertext string until decrypted on read.
         return Turn(
             query=self._cipher.encrypt(turn.query),
             resolved=self._cipher.encrypt(turn.resolved),
             answer=self._cipher.encrypt(turn.answer),
             refused=turn.refused,
+            citations=self._cipher.encrypt(json.dumps(turn.citations)),  # type: ignore[arg-type]
         )
 
     def _decrypt(self, stored: ConversationRecord) -> ConversationRecord:
@@ -146,6 +156,7 @@ class InMemoryConversationStore:
                     resolved=self._cipher.decrypt(t.resolved),
                     answer=self._cipher.decrypt(t.answer),
                     refused=t.refused,
+                    citations=json.loads(self._cipher.decrypt(t.citations)),
                 )
                 for t in stored.turns
             ],

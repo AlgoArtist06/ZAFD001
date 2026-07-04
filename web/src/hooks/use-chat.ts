@@ -145,16 +145,22 @@ export function useChat({ getToken }: UseChatOptions) {
       if (!response.ok) return;
       const data = await response.json();
       const turns: Turn[] = (data?.turns ?? []).flatMap(
-        (turn: { query: string; answer: string; refused: boolean }) => [
+        (turn: {
+          query: string;
+          answer: string;
+          refused: boolean;
+          citations?: { reference: string; verbatim: string; url: string }[];
+        }) => [
           { role: "user" as const, text: turn.query },
           {
             role: "assistant" as const,
             answer: {
-              // Persisted turns store the flat rendered answer; it reloads as
-              // one explanation block in the right state.
+              // Persisted turns store the flat rendered answer plus the
+              // verified Citations, so a reload shows the same verbatim
+              // statutory text the live answer streamed.
               state: turn.refused ? ("refusal" as const) : ("normal" as const),
               explanation: turn.answer,
-              citations: [],
+              citations: turn.citations ?? [],
             },
           },
         ],

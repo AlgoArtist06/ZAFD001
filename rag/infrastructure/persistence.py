@@ -12,6 +12,7 @@ Only the placeholder marker and two column types differ; the queries are one.
 """
 from __future__ import annotations
 
+import json
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -266,8 +267,9 @@ class PostgresConversationStore(_SqlStore):
                 raise KeyError(conversation_id)
             cur.execute(
                 self._q(
-                    "INSERT INTO turns (conversation_id, query, resolved, answer, refused) "
-                    "VALUES (?, ?, ?, ?, ?)"
+                    "INSERT INTO turns "
+                    "(conversation_id, query, resolved, answer, refused, citations) "
+                    "VALUES (?, ?, ?, ?, ?, ?)"
                 ),
                 (
                     conversation_id,
@@ -275,6 +277,7 @@ class PostgresConversationStore(_SqlStore):
                     self._cipher.encrypt(turn.resolved),
                     self._cipher.encrypt(turn.answer),
                     turn.refused,
+                    self._cipher.encrypt(json.dumps(turn.citations)),
                 ),
             )
 
@@ -310,7 +313,7 @@ class PostgresConversationStore(_SqlStore):
     def _load_turns(self, cur: Any, conversation_id: str) -> List[Turn]:
         cur.execute(
             self._q(
-                "SELECT query, resolved, answer, refused FROM turns "
+                "SELECT query, resolved, answer, refused, citations FROM turns "
                 "WHERE conversation_id = ? ORDER BY seq"
             ),
             (conversation_id,),
@@ -321,8 +324,11 @@ class PostgresConversationStore(_SqlStore):
                 resolved=self._cipher.decrypt(resolved),
                 answer=self._cipher.decrypt(answer),
                 refused=bool(refused),
+                # Rows persisted before the citations column carry the empty
+                # migration default, which reads back as "no citations".
+                citations=json.loads(self._cipher.decrypt(citations)) if citations else [],
             )
-            for query, resolved, answer, refused in cur.fetchall()
+            for query, resolved, answer, refused, citations in cur.fetchall()
         ]
 
     def _ensure_schema(self) -> None:
@@ -343,6 +349,24 @@ class PostgresConversationStore(_SqlStore):
                 f"  query TEXT NOT NULL,"
                 f"  resolved TEXT NOT NULL,"
                 f"  answer TEXT NOT NULL,"
-                f"  refused {bool_type} NOT NULL"
+                f"  refused {bool_type} NOT NULL,"
+                f"  citations TEXT NOT NULL DEFAULT ''"
                 f")"
             )
+        # Migrate pre-citations databases: add the column when it is missing.
+        # An empty value reads back as "no citations", so old rows stay valid.
+        # ponytail: try/except beats dialect-specific IF NOT EXISTS probing.
+        try:
+            with self._cursor() as cur:
+                cur.execute(
+                    "ALTER TABLE turns ADD COLUMN citations TEXT NOT NULL DEFAULT ''"
+                )
+        except Exception:
+            pass  # the column already exists
+        # Migrate dual-mode-era databases: the removed NOT NULL mode column
+        # would reject every INSERT the mode-less code now issues.
+        try:
+            with self._cursor() as cur:
+                cur.execute("ALTER TABLE conversations DROP COLUMN mode")
+        except Exception:
+            pass  # the column is already gone
