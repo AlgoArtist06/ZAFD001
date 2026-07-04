@@ -4,6 +4,7 @@ import { Scale } from "lucide-react";
 import { Hero } from "@/components/landing/hero";
 import { Sources } from "@/components/landing/sources";
 import { Trust } from "@/components/landing/trust";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 
 // The public face: a static page that establishes what the product is, what it
@@ -27,6 +28,7 @@ export default function LandingPage() {
           </div>
         </div>
         <nav className="flex items-center gap-2">
+          <ThemeToggle />
           <Button asChild variant="ghost" className="min-h-11">
             <Link href="/sign-in">Sign in</Link>
           </Button>

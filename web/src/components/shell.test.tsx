@@ -55,6 +55,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   document.documentElement.classList.remove("dark");
+  window.localStorage.clear();
 });
 
 async function ask(question: string) {
@@ -72,6 +73,21 @@ describe("Shell", () => {
     await user.click(screen.getByRole("button", { name: /use dark mode/i }));
 
     expect(document.documentElement).toHaveClass("dark");
+  });
+
+  it("keeps a pre-applied dark theme when it mounts (never resets to light)", async () => {
+    // The root layout's inline script sets this before paint; entering /chat
+    // must not strip it. The old hook cleared the class on mount from its
+    // initial light state - this pins that it no longer does.
+    document.documentElement.classList.add("dark");
+    window.localStorage.setItem("theme", "dark");
+
+    render(<Shell />);
+    // Let mount effects run.
+    await screen.findByRole("button", { name: /use light mode/i });
+
+    expect(document.documentElement).toHaveClass("dark");
+    expect(window.localStorage.getItem("theme")).toBe("dark");
   });
 
   it("renders the asked question and streams the assistant answer into the thread", async () => {
