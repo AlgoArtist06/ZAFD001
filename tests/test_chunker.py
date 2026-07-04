@@ -72,3 +72,37 @@ def test_token_threshold_governs_the_split():
 
 def test_estimate_tokens_grows_with_text():
     assert estimate_tokens("one two three") < estimate_tokens("one two three four five")
+
+
+def test_repeated_sub_section_labels_get_unique_chunk_ids():
+    # A chunk_id is the vector store's primary key, so repeated sub-section labels
+    # within one section (common in definitions) must not collide and overwrite.
+    from datetime import date
+
+    from ingestion.models import ActType
+    from ingestion.chunker import chunk_section
+    from ingestion.parser import ParsedAct, Section, SubSection
+
+    act = ParsedAct(
+        act_id="cpa",
+        act_name="Consumer Protection Act",
+        act_year=2019,
+        act_type=ActType.CONSUMER,
+        source_url="https://example.gov.in/cpa",
+        retrieval_date=date(2026, 6, 28),
+        source_hash="deadbeef",
+    )
+    section = Section(
+        section_number="2",
+        heading="Definitions",
+        full_text="(i) alpha (ii) beta (i) gamma",
+        sub_sections=[SubSection("i", "alpha"), SubSection("ii", "beta"), SubSection("i", "gamma")],
+        is_definition=True,
+    )
+
+    children = chunk_section(act, section, token_threshold=0)
+    ids = [c.chunk_id for c in children]
+
+    assert len(ids) == len(set(ids))  # unique despite the repeated "i" label
+    assert ids == ["cpa-2-i", "cpa-2-ii", "cpa-2-i-2"]
+    assert [c.sub_section for c in children] == ["i", "ii", "i"]  # display label kept

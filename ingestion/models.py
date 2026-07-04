@@ -21,6 +21,10 @@ class ActType(str, Enum):
     IP = "ip"
     CONSTITUTIONAL = "constitutional"
     SCHEME = "scheme"
+    CYBER = "cyber"
+    TRANSPORT = "transport"
+    GOVERNANCE = "governance"
+    PROTECTION = "protection"
 
 
 @dataclass(frozen=True)

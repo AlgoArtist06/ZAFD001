@@ -10,16 +10,16 @@ import logging
 
 import pytest
 
-from rag.accounts import SessionVerifier
-from rag.answer import LegalAssistant
-from rag.privacy import ConsentLedger, ConsentRequired
-from rag.shell import ChatShell, Unauthenticated
+from rag.domain.accounts import SessionVerifier
+from tests.doubles import offline_assistant
+from rag.domain.privacy import ConsentLedger, ConsentRequired
+from rag.services.chat import ChatShell, Unauthenticated
 
 
 def _shell(corpus):
     verifier = SessionVerifier()
     consent = ConsentLedger()
-    shell = ChatShell(LegalAssistant(corpus), verifier=verifier, consent=consent)
+    shell = ChatShell(offline_assistant(corpus), verifier=verifier, consent=consent)
     return shell, verifier, consent
 
 
@@ -42,15 +42,15 @@ def test_signup_with_consent_records_it_and_returns_a_usable_session(corpus):
     token = shell.sign_up("user-asha", accept_privacy_notice=True)
     assert consent.has_consented("user-asha") is True
     # The returned session works: the user can open a Conversation.
-    convo = shell.new_chat(token, mode="citizen")
-    assert convo.mode == "citizen"
+    convo = shell.new_chat(token)
+    assert convo.id
 
 
 def test_a_user_can_delete_a_single_conversation(corpus):
     shell, _, _ = _shell(corpus)
     token = shell.sign_up("user-asha", accept_privacy_notice=True)
-    keep = shell.new_chat(token, mode="citizen")
-    drop = shell.new_chat(token, mode="citizen")
+    keep = shell.new_chat(token)
+    drop = shell.new_chat(token)
 
     shell.delete_conversation(token, drop.id)
 
@@ -60,7 +60,7 @@ def test_a_user_can_delete_a_single_conversation(corpus):
 def test_deleting_an_account_purges_all_stored_data_and_consent(corpus):
     shell, _, consent = _shell(corpus)
     token = shell.sign_up("user-asha", accept_privacy_notice=True)
-    convo = shell.new_chat(token, mode="citizen")
+    convo = shell.new_chat(token)
     shell.send(token, convo.id, "punishment for theft of movable property")
 
     shell.delete_account(token)
@@ -74,7 +74,7 @@ def test_deleting_an_account_purges_all_stored_data_and_consent(corpus):
 def test_sensitive_query_content_never_reaches_plaintext_logs(corpus, caplog):
     shell, _, _ = _shell(corpus)
     token = shell.sign_up("user-asha", accept_privacy_notice=True)
-    convo = shell.new_chat(token, mode="citizen")
+    convo = shell.new_chat(token)
 
     secret = "my landlord illegally evicted me from my home"
     with caplog.at_level(logging.DEBUG):

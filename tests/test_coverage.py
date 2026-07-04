@@ -9,10 +9,11 @@ MANIFEST = {
 
 def test_full_in_scope_coverage_reports_100_percent_and_no_missing():
     report = build_coverage_report(
-        {"bns": {"1", "2", "3", "4", "5"}, "cpa": {"2", "4"}}, MANIFEST
+        {"bns": {"1", "2", "3", "4", "5", "99"}, "cpa": {"2", "4"}}, MANIFEST
     )
     assert report.per_act["bns"].coverage == 1.0
     assert report.per_act["bns"].missing_sections == []
+    assert report.overall_coverage == 1.0
 
 
 def test_partial_coverage_logs_the_missing_in_scope_sections():

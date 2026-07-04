@@ -75,7 +75,8 @@ The product may cite a Landmark Judgment but may never invent or generalise case
 _Avoid_: precedent, case, ruling (when referring to the curated, citable ones)
 
 **Covered Domain**:
-One of the legal areas the product handles: intellectual property rights, consumer rights, fundamental rights (Part III only), criminal law and interactions, and flagship government schemes.
+One of the legal areas the product handles: intellectual property rights, consumer rights, fundamental rights (Part III only), criminal law and interactions, flagship government schemes, cyber law (IT Act), motor vehicle and traffic law, the right to information, and protection from domestic violence and workplace harassment.
+Each Covered Domain maps to an `ActType` and is routed by trigger words before retrieval.
 _Avoid_: category, topic, area
 
 **Coverage**:
@@ -89,20 +90,10 @@ _Avoid_: completeness, ingestion percentage
 An answer derived only from retrieved Source of Truth text, with every claim carrying a Citation.
 _Avoid_: response, generated answer
 
-**Citizen Mode**:
-The answering profile for users without legal training: complaints are interpreted into legal concepts, and answers are plain, step-by-step, and heavily disclaimed.
-_Avoid_: simple mode, beginner mode, layman mode
-
-**Professional Mode**:
-The answering profile for users with legal knowledge: queries are taken as precise legal terms, and answers are terse and citation-dense.
-_Avoid_: expert mode, advanced mode, pro mode
-
-**Mode**:
-The Citizen-or-Professional profile chosen when a Conversation starts and fixed for its lifetime.
-_Avoid_: setting, persona, role
+A single answering profile serves every user: complaints are interpreted into legal concepts, and answers are plain, step-by-step, and heavily disclaimed.
 
 **Confirmation Step**:
-The clarifying check ("did you mean...?") used in Citizen Mode before answering an ambiguous query.
+The clarifying check ("did you mean...?") used before answering an ambiguous query.
 _Avoid_: prompt, clarification
 
 ### Language and translation
@@ -121,10 +112,6 @@ _Avoid_: locale, language pack
 **Citizen**:
 A member of the public seeking to understand their rights; the primary user and the default audience.
 _Avoid_: user, customer, client, end user
-
-**Professional**:
-A user with legal training (lawyer, para-legal) who uses Professional Mode.
-_Avoid_: expert, lawyer (when you mean the user role specifically)
 
 **Conversation**:
 A single multi-turn chat with its own isolated context and a fixed Mode.

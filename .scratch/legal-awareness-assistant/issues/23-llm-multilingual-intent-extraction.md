@@ -1,6 +1,6 @@
 # LLM-backed multilingual intent extraction
 
-Status: ready-for-agent
+Status: done
 
 ## Parent
 
@@ -18,15 +18,28 @@ Selection is keyless-safe per the config seam: with the LLM configured, intent e
 
 ## Acceptance criteria
 
-- [ ] The language-detection and query-normalization step calls the live LLM client when configured, via the config seam
-- [ ] A code-mixed query (for example Hinglish) is normalized to an English query with legal terms preserved, then answered in the user's language
-- [ ] The glossary-grounded translation remains a deterministic hard-constraint lookup; the LLM does not replace it
-- [ ] Citations and verbatim statutory text stay in original English; critical legal terms show the English term inline in brackets
-- [ ] Normalized queries flow through the unchanged retrieval, grounding, citation-verification, and guardrail pipeline
-- [ ] With no LLM key configured, deterministic normalization serves and the full suite passes offline
-- [ ] Per-language behavior is covered by tests at the answer seam (Hindi, Tamil, Gujarati)
+- [x] The language-detection and query-normalization step calls the live LLM client when configured, via the config seam
+- [x] A code-mixed query (for example Hinglish) is normalized to an English query with legal terms preserved, then answered in the user's language
+- [x] The glossary-grounded translation remains a deterministic hard-constraint lookup; the LLM does not replace it
+- [x] Citations and verbatim statutory text stay in original English; critical legal terms show the English term inline in brackets
+- [x] Normalized queries flow through the unchanged retrieval, grounding, citation-verification, and guardrail pipeline
+- [x] With no LLM key configured, deterministic normalization serves and the full suite passes offline
+- [x] Per-language behavior is covered by tests at the answer seam (Hindi, Tamil, Gujarati)
 
 ## Blocked by
 
 - `20-config-seam-and-secret-hygiene.md`
 - `21-live-gemini-grounded-answer.md`
+
+## Comments
+
+Added an `IntentExtractor` selection seam to `rag/multilingual.py`, mirroring the existing embedder and generator seams.
+`LLMIntentExtractor` detects the language, then calls the live OpenAI-compatible LLM client (same endpoint/model/key as generation) to normalize a non-English or code-mixed query to English, injecting the glossary's critical terms for the detected language as hard `term_constraints` so the deterministic glossary - not the model - fixes legal terminology.
+A pure-English query short-circuits without an LLM call, and any field the model omits falls back to the deterministic glossary lookup.
+`DeterministicIntentExtractor` wraps the existing `normalize_query` so with no key the suite stays offline.
+
+Selection runs through the config seam: `AppConfig.create_intent_extractor(glossary)` returns the LLM extractor when `LLM_API_KEY` is set, otherwise the deterministic one.
+`LegalAssistant` now normalizes through `self._intent.normalize(query)`; the rest of the pipeline (screening/guardrails, IPC->BNS recognition, retrieval, expansion, grounded generation, citation verification, refusal) is unchanged, as is the glossary-grounded output rendering (critical terms in the user's language with the English term inline in brackets; citations and verbatim statutory text stay in original English).
+
+New tests in `tests/test_live_multilingual.py` cover the keyed path at the answer seam for Hindi (code-mixed Hinglish), Tamil, and Gujarati, plus a guard that a pure-English query skips the intent model.
+The deterministic offline path stays covered by the existing `test_multilingual*` suites.

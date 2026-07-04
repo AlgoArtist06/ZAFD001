@@ -33,12 +33,23 @@ const EMERGENCY: StructuredAnswer = {
 // answer, still carrying the legal-aid pointer and disclaimer.
 const REFUSAL: StructuredAnswer = {
   state: "refusal",
+  reason: "no_match",
   explanation: "I do not have a sourced answer for that",
   citations: [],
   nextStep:
     "For help, consider contacting a lawyer or your nearest Legal Services Authority (NALSA / DLSA).",
   disclaimer:
     "This is legal information, not legal advice. For help, consult a lawyer or your nearest Legal Services Authority (NALSA / DLSA).",
+};
+
+// A service failure: the language model gave no answer. The view must say so
+// explicitly and show what actually failed.
+const ERROR: StructuredAnswer = {
+  state: "error",
+  detail: "ReadError: connection lost",
+  explanation:
+    "The assistant could not reach its language model just now, so this question was not answered.",
+  citations: [],
 };
 
 describe("AnswerView", () => {
@@ -86,6 +97,30 @@ describe("AnswerView", () => {
 
     expect(
       screen.getByText(/I do not have a sourced answer for that/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: /legal basis/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("says exactly why a refusal happened when the reason is a corpus miss", () => {
+    render(<AnswerView answer={REFUSAL} />);
+
+    expect(screen.getByText(/No matching source documents/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/did not match any document in the stored legal sources/),
+    ).toBeInTheDocument();
+  });
+
+  it("renders a model failure as an explicit error with the failure detail", () => {
+    render(<AnswerView answer={ERROR} />);
+
+    const alert = screen.getByRole("alert");
+    expect(
+      within(alert).getByText(/language model did not return an answer/i),
+    ).toBeInTheDocument();
+    expect(
+      within(alert).getByText(/ReadError: connection lost/),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("region", { name: /legal basis/i }),

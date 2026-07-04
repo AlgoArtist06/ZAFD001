@@ -1,10 +1,17 @@
+import sys
+from types import SimpleNamespace
+
 import pytest
 
 from config import ConfigError, load_config
-from ingestion.vectorstore import DeterministicEmbedder, InMemoryVectorStore
-from rag.answer import LegalAssistant
-from rag.generation import DeterministicGenerator, OpenAICompatibleGenerator
-from rag.retrieval import HybridRetriever
+from ingestion.vectorstore import (
+    FastEmbedEmbedder,
+    QdrantVectorStore,
+    create_embedder,
+    create_vector_store,
+)
+from rag.composition import create_generator
+from rag.infrastructure.llm import OpenAICompatibleGenerator
 
 
 def test_load_config_applies_documented_defaults_and_typed_overrides():
@@ -51,10 +58,10 @@ def test_load_config_rejects_malformed_typed_values_with_the_variable_name():
         ({"RETRIEVAL_TOP_K": "0"}, "RETRIEVAL_TOP_K"),
         ({"HYBRID_ALPHA": "1.1"}, "HYBRID_ALPHA"),
         ({"SUPPORTED_LANGUAGES": "en,xx"}, "SUPPORTED_LANGUAGES"),
-        ({"DEFAULT_MODE": "admin"}, "DEFAULT_MODE"),
         ({"LLM_BASE_URL": "not-a-url"}, "LLM_BASE_URL"),
         ({"QDRANT_URL": "localhost:6333"}, "QDRANT_URL"),
         ({"QDRANT_API_KEY": "key-without-url"}, "QDRANT_API_KEY"),
+        ({"QDRANT_URL": "https://remote.example.com:6333"}, "unauthenticated"),
         ({"CLERK_SECRET_KEY": "secret-without-public-key"}, "CLERK"),
     ],
 )
@@ -63,19 +70,14 @@ def test_load_config_rejects_invalid_configuration(environ, setting):
         load_config(environ)
 
 
-def test_keyless_config_selects_every_offline_adapter():
+def test_keyless_config_refuses_to_build_a_generator():
+    # Live-only answering (ADR 0010): without LLM_API_KEY there is no
+    # generator and no app - never a deterministic stand-in.
     config = load_config({})
 
-    generator = config.create_generator()
-    embedder = config.create_embedder()
-    vector_store = config.create_vector_store(embedder)
-
-    assert config.generator_backend == "deterministic"
-    assert config.embedder_backend == "deterministic"
-    assert config.vector_store_backend == "memory"
-    assert isinstance(generator, DeterministicGenerator)
-    assert isinstance(embedder, DeterministicEmbedder)
-    assert isinstance(vector_store, InMemoryVectorStore)
+    assert config.generator_backend == "unconfigured"
+    with pytest.raises(ConfigError, match="LLM_API_KEY"):
+        create_generator(config)
 
 
 def test_service_configuration_selects_live_adapter_names_for_later_adapters():
@@ -86,6 +88,16 @@ def test_service_configuration_selects_live_adapter_names_for_later_adapters():
     assert config.generator_backend == "openai"
     assert config.embedder_backend == "fastembed"
     assert config.vector_store_backend == "qdrant"
+
+
+def test_fastembed_is_the_only_embedder():
+    # FastEmbed is local and keyless, so it needs no vector server; the
+    # in-memory store over real embeddings serves when Qdrant is absent.
+    local = load_config({})
+    assert local.embedder_backend == "fastembed"
+    assert local.vector_store_backend == "memory"
+    with pytest.raises(ConfigError, match="EMBEDDING_PROVIDER"):
+        load_config({"EMBEDDING_PROVIDER": "hash"})
 
 
 def test_example_secret_placeholders_do_not_activate_live_adapters():
@@ -100,15 +112,21 @@ def test_example_secret_placeholders_do_not_activate_live_adapters():
     assert config.llm_api_key is None
     assert config.clerk_publishable_key is None
     assert config.clerk_secret_key is None
-    assert config.generator_backend == "deterministic"
+    assert config.generator_backend == "unconfigured"
 
 
-def test_composition_points_resolve_adapters_through_config(corpus):
+def test_composition_points_resolve_adapters_through_config(monkeypatch):
     configured = load_config({"LLM_API_KEY": "test-key"})
-    assert isinstance(configured.create_generator(), OpenAICompatibleGenerator)
+    assert isinstance(create_generator(configured), OpenAICompatibleGenerator)
 
-    with pytest.raises(ConfigError, match="fastembed adapter"):
-        HybridRetriever(
-            corpus,
-            app_config=load_config({"QDRANT_URL": "http://localhost:6333"}),
-        )
+    monkeypatch.setitem(
+        sys.modules,
+        "fastembed",
+        SimpleNamespace(TextEmbedding=lambda **kwargs: SimpleNamespace()),
+    )
+    live = load_config({"QDRANT_URL": "http://localhost:6333"})
+    embedder = create_embedder(live)
+    store = create_vector_store(live, embedder)
+
+    assert isinstance(embedder, FastEmbedEmbedder)
+    assert isinstance(store, QdrantVectorStore)

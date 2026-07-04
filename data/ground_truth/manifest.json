@@ -1,45 +1,162 @@
 {
-  "_note": "Phase 0 ground truth. official_total_sections are the published section counts of each in-scope act (the remainder beyond what is ingested is logged and known). in_scope_sections is the curated v1 target; ingesting most of it lands coverage in the 80-90% band. spot_check pins verbatim values and section counts to the bare-act text the agent did not generate, so content-accuracy tests never grade their own homework.",
+  "_note": "Phase 0 ground truth. official_total_sections are the published section counts of each in-scope act; every act is now ingested in full from the official India Code / Legislative Department text, so expected_ingested_sections is the count of section entries in the current official text (lettered insertions like 66C add to it; sections omitted by amendment, like Patents 95-98, subtract). in_scope_sections stays the curated eval target used for the coverage gate. spot_check pins verbatim values to the bare-act text the agent did not generate, so content-accuracy tests never grade their own homework.",
   "acts": {
     "bns": {
       "official_total_sections": 358,
-      "in_scope_sections": ["2", "103", "115", "303", "318", "351"],
-      "expected_ingested_sections": 5
+      "in_scope_sections": [
+        "2",
+        "103",
+        "115",
+        "303",
+        "318",
+        "351"
+      ],
+      "expected_ingested_sections": 358
     },
     "bnss": {
       "official_total_sections": 531,
-      "in_scope_sections": ["35", "47", "173", "187", "196", "479"],
-      "expected_ingested_sections": 5
+      "in_scope_sections": [
+        "35",
+        "47",
+        "173",
+        "187",
+        "196",
+        "479"
+      ],
+      "expected_ingested_sections": 531
     },
     "bsa": {
       "official_total_sections": 170,
-      "in_scope_sections": ["3", "39", "61", "105", "109", "63"],
-      "expected_ingested_sections": 5
+      "in_scope_sections": [
+        "3",
+        "39",
+        "61",
+        "105",
+        "109",
+        "63"
+      ],
+      "expected_ingested_sections": 170
     },
     "cpa": {
       "official_total_sections": 107,
-      "in_scope_sections": ["2", "17", "35", "38", "100", "90"],
-      "expected_ingested_sections": 5
+      "in_scope_sections": [
+        "2",
+        "17",
+        "35",
+        "38",
+        "100",
+        "90"
+      ],
+      "expected_ingested_sections": 107
     },
     "copyright": {
       "official_total_sections": 79,
-      "in_scope_sections": ["13", "14", "17", "51", "57", "63"],
-      "expected_ingested_sections": 5
+      "in_scope_sections": [
+        "13",
+        "14",
+        "17",
+        "51",
+        "57",
+        "63"
+      ],
+      "expected_ingested_sections": 105
     },
     "trademarks": {
       "official_total_sections": 159,
-      "in_scope_sections": ["9", "18", "28", "29", "134", "11"],
-      "expected_ingested_sections": 5
+      "in_scope_sections": [
+        "9",
+        "18",
+        "28",
+        "29",
+        "134",
+        "11"
+      ],
+      "expected_ingested_sections": 169
     },
     "patents": {
       "official_total_sections": 163,
-      "in_scope_sections": ["2", "3", "6", "53", "48", "64"],
-      "expected_ingested_sections": 5
+      "in_scope_sections": [
+        "2",
+        "3",
+        "6",
+        "53",
+        "48",
+        "64"
+      ],
+      "expected_ingested_sections": 175
     },
     "constitution": {
-      "official_total_sections": 24,
-      "in_scope_sections": ["14", "15", "19", "21", "22", "20"],
-      "expected_ingested_sections": 5
+      "official_total_sections": 30,
+      "in_scope_sections": [
+        "14",
+        "15",
+        "19",
+        "21",
+        "22",
+        "20"
+      ],
+      "expected_ingested_sections": 30
+    },
+    "it_act": {
+      "official_total_sections": 94,
+      "in_scope_sections": [
+        "43",
+        "66",
+        "66C",
+        "66D",
+        "67",
+        "72"
+      ],
+      "expected_ingested_sections": 124
+    },
+    "mv_act": {
+      "official_total_sections": 217,
+      "in_scope_sections": [
+        "3",
+        "129",
+        "130",
+        "184",
+        "185",
+        "194B",
+        "196"
+      ],
+      "expected_ingested_sections": 257
+    },
+    "rti_act": {
+      "official_total_sections": 31,
+      "in_scope_sections": [
+        "3",
+        "6",
+        "7",
+        "8",
+        "18",
+        "19"
+      ],
+      "expected_ingested_sections": 31
+    },
+    "dv_act": {
+      "official_total_sections": 37,
+      "in_scope_sections": [
+        "3",
+        "12",
+        "17",
+        "18",
+        "19",
+        "20"
+      ],
+      "expected_ingested_sections": 37
+    },
+    "posh_act": {
+      "official_total_sections": 30,
+      "in_scope_sections": [
+        "3",
+        "4",
+        "9",
+        "11",
+        "13",
+        "19"
+      ],
+      "expected_ingested_sections": 30
     }
   },
   "spot_check": [
@@ -62,6 +179,31 @@
       "act_id": "patents",
       "section": "53",
       "verbatim_contains": "twenty years from the date of filing"
+    },
+    {
+      "act_id": "it_act",
+      "section": "66C",
+      "verbatim_contains": "unique identification feature of any other person"
+    },
+    {
+      "act_id": "mv_act",
+      "section": "185",
+      "verbatim_contains": "alcohol exceeding 30 mg. per 100 ml. of blood"
+    },
+    {
+      "act_id": "rti_act",
+      "section": "3",
+      "verbatim": "Subject to the provisions of this Act, all citizens shall have the right to information."
+    },
+    {
+      "act_id": "dv_act",
+      "section": "18",
+      "verbatim_contains": "aiding or abetting in the commission of acts of domestic violence"
+    },
+    {
+      "act_id": "posh_act",
+      "section": "9",
+      "verbatim_contains": "within a period of three months from the date of incident"
     }
   ]
 }

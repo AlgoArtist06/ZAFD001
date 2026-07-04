@@ -1,15 +1,16 @@
-"""Typed application configuration and adapter selection."""
+"""Typed application configuration.
+
+Settings and their validation only. Which adapter runs behind each seam is
+decided from these values in the composition roots: :mod:`rag.composition` for
+the RAG application and :mod:`ingestion.vectorstore` for the ingestion-owned
+embedding and vector-store seams.
+"""
 from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Mapping, Optional, Tuple
+from typing import Mapping, Optional, Tuple
 from urllib.parse import urlparse
-
-if TYPE_CHECKING:
-    from ingestion.vectorstore import Embedder, InMemoryVectorStore
-    from rag.generation import Generator
-    from rag.multilingual import BilingualGlossary
 
 
 class ConfigError(ValueError):
@@ -36,48 +37,27 @@ class AppConfig:
     app_env: str
     backend_url: str
     public_api_url: str
+    web_origin: Optional[str]
+    conversation_encryption_key: Optional[str]
     chunk_token_threshold: int
     retrieval_top_k: int
     hybrid_alpha: float
     supported_languages: Tuple[str, ...]
-    default_mode: str
 
     @property
     def generator_backend(self) -> str:
-        return "openai" if self.llm_api_key else "deterministic"
+        # There is no offline generator (ADR 0010): without a key the app
+        # refuses to start rather than serving template answers.
+        return "openai" if self.llm_api_key else "unconfigured"
 
     @property
     def embedder_backend(self) -> str:
-        return "fastembed" if self.qdrant_url else "deterministic"
+        # FastEmbed is local, CPU, and keyless - and it is the only embedder.
+        return "fastembed"
 
     @property
     def vector_store_backend(self) -> str:
         return "qdrant" if self.qdrant_url else "memory"
-
-    def create_generator(
-        self, glossary: Optional["BilingualGlossary"] = None
-    ) -> "Generator":
-        from rag.generation import DeterministicGenerator, OpenAICompatibleGenerator
-
-        if self.llm_api_key:
-            return OpenAICompatibleGenerator(
-                self.llm_api_key, self.llm_base_url, self.llm_model
-            )
-        return DeterministicGenerator(glossary)
-
-    def create_embedder(self, dim: Optional[int] = None) -> "Embedder":
-        if self.embedder_backend != "deterministic":
-            raise ConfigError("fastembed adapter is not installed")
-        from ingestion.vectorstore import DeterministicEmbedder
-
-        return DeterministicEmbedder(dim=dim or self.embedding_dim)
-
-    def create_vector_store(self, embedder: "Embedder") -> "InMemoryVectorStore":
-        if self.vector_store_backend != "memory":
-            raise ConfigError("qdrant adapter is not installed")
-        from ingestion.vectorstore import InMemoryVectorStore
-
-        return InMemoryVectorStore(embedder)
 
 
 def _optional(env: Mapping[str, str], name: str) -> Optional[str]:
@@ -129,15 +109,29 @@ def _validate(config: AppConfig) -> AppConfig:
         "gu",
     }:
         raise ConfigError("SUPPORTED_LANGUAGES must contain only en, hi, ta, gu")
-    if config.default_mode not in {"citizen", "professional"}:
-        raise ConfigError("DEFAULT_MODE must be citizen or professional")
+    if config.embedding_provider != "fastembed":
+        raise ConfigError(
+            "EMBEDDING_PROVIDER must be fastembed - it is the only embedder; "
+            "the product has no offline stand-in"
+        )
     _validate_url("LLM_BASE_URL", config.llm_base_url, ("http", "https"))
     _validate_url("QDRANT_URL", config.qdrant_url, ("http", "https"))
     _validate_url("BACKEND_URL", config.backend_url, ("http", "https"))
     _validate_url("NEXT_PUBLIC_API_URL", config.public_api_url, ("http", "https"))
+    _validate_url("WEB_ORIGIN", config.web_origin, ("http", "https"))
     _validate_url("DATABASE_URL", config.database_url, ("postgres", "postgresql"))
     if config.qdrant_api_key and not config.qdrant_url:
         raise ConfigError("QDRANT_API_KEY requires QDRANT_URL")
+    if (
+        config.qdrant_url
+        and not config.qdrant_api_key
+        and urlparse(config.qdrant_url).hostname
+        not in {"localhost", "127.0.0.1", "::1"}
+    ):
+        raise ConfigError(
+            "QDRANT_URL points at a remote host but QDRANT_API_KEY is not set: "
+            "refusing to talk to an unauthenticated remote vector store"
+        )
     if bool(config.clerk_publishable_key) != bool(config.clerk_secret_key):
         raise ConfigError("CLERK publishable and secret keys must be configured together")
     if not config.clerk_sign_in_url.startswith("/"):
@@ -145,6 +139,39 @@ def _validate(config: AppConfig) -> AppConfig:
     if not config.clerk_sign_up_url.startswith("/"):
         raise ConfigError("NEXT_PUBLIC_CLERK_SIGN_UP_URL must be an absolute path")
     return config
+
+
+def load_dotenv(path: str) -> None:
+    """Load ``KEY=VALUE`` lines from a ``.env`` file into the process environment.
+
+    The single place both entry points - the RAG backend
+    (:func:`rag.composition.build_demo_app`) and the ingestion CLI
+    (``python -m ingestion``) - pick up ``.env`` the way Next.js picks up
+    ``.env.local``, rather than silently running on defaults when the operator
+    forgets ``set -a; source .env``. A variable already present in the
+    environment always wins, so config the deployment injects (Docker, systemd, a
+    secret manager) is never overridden by the file. A missing file is a no-op;
+    malformed lines are skipped, not fatal.
+    """
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            lines = handle.readlines()
+    except FileNotFoundError:
+        return
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export ") :]
+        key, sep, value = line.partition("=")
+        if not sep:
+            continue
+        key, value = key.strip(), value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+            value = value[1:-1]
+        if key:
+            os.environ.setdefault(key, value)
 
 
 def load_config(environ: Optional[Mapping[str, str]] = None) -> AppConfig:
@@ -182,6 +209,10 @@ def load_config(environ: Optional[Mapping[str, str]] = None) -> AppConfig:
             public_api_url=_text(
                 env, "NEXT_PUBLIC_API_URL", "http://localhost:8000"
             ),
+            web_origin=_optional(env, "WEB_ORIGIN"),
+            conversation_encryption_key=_optional(
+                env, "CONVERSATION_ENCRYPTION_KEY"
+            ),
             chunk_token_threshold=_integer(env, "CHUNK_TOKEN_THRESHOLD", 512),
             retrieval_top_k=_integer(env, "RETRIEVAL_TOP_K", 8),
             hybrid_alpha=_number(env, "HYBRID_ALPHA", 0.5),
@@ -192,6 +223,5 @@ def load_config(environ: Optional[Mapping[str, str]] = None) -> AppConfig:
                 ).split(",")
                 if item.strip()
             ),
-            default_mode=_text(env, "DEFAULT_MODE", "citizen"),
         )
     )

@@ -1,13 +1,14 @@
 """Parent-section and sibling expansion before generation."""
 from ingestion.models import ActType
 
-from rag.domain import route_domains
-from rag.expansion import expand
-from rag.retrieval import HybridRetriever
+from rag.domain.routing import route_domains
+from rag.domain.expansion import expand
+from rag.domain.retrieval import HybridRetriever
+from tests.doubles import HashEmbedder
 
 
 def test_a_matched_child_expands_to_its_parent_and_siblings(corpus):
-    retriever = HybridRetriever(corpus)
+    retriever = HybridRetriever(corpus, embedder=HashEmbedder())
     # cpa-35 is split into children 35(1) and 35(2); a query that only hits one
     # child must still surface the whole section.
     hits = retriever.retrieve(
@@ -24,7 +25,7 @@ def test_a_matched_child_expands_to_its_parent_and_siblings(corpus):
 
 
 def test_a_whole_section_hit_expands_to_itself(corpus):
-    retriever = HybridRetriever(corpus)
+    retriever = HybridRetriever(corpus, embedder=HashEmbedder())
     hits = retriever.retrieve("theft of property", [ActType.CRIMINAL])
     sections = expand(hits, corpus)
     bns = next(s for s in sections if s.section_number == "303")

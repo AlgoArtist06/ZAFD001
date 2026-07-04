@@ -9,3 +9,6 @@ venv/
 
 # Stray Node tooling caches if a JS tool is run from the repo root instead of web/
 node_modules/
+
+# macOS Finder metadata
+.DS_Store

@@ -8,13 +8,13 @@ Conversation content is encrypted at rest: the store hands the cipher seam the
 plaintext to encrypt before persisting it, and decrypts on read, so the words a
 Citizen typed never sit in storage in the clear.
 """
-from rag.store import InMemoryConversationStore, Turn
+from rag.domain.conversations import InMemoryConversationStore, Turn
 
 
 def test_a_user_can_delete_one_of_their_conversations():
     store = InMemoryConversationStore()
-    keep = store.create(user_id="user-asha", mode="citizen")
-    drop = store.create(user_id="user-asha", mode="citizen")
+    keep = store.create(user_id="user-asha")
+    drop = store.create(user_id="user-asha")
 
     store.delete("user-asha", drop.id)
 
@@ -24,7 +24,7 @@ def test_a_user_can_delete_one_of_their_conversations():
 
 def test_a_user_cannot_delete_another_users_conversation():
     store = InMemoryConversationStore()
-    ashas = store.create(user_id="user-asha", mode="citizen")
+    ashas = store.create(user_id="user-asha")
 
     store.delete("user-ravi", ashas.id)
 
@@ -33,9 +33,9 @@ def test_a_user_cannot_delete_another_users_conversation():
 
 def test_deleting_all_data_for_a_user_purges_only_their_conversations():
     store = InMemoryConversationStore()
-    store.create(user_id="user-asha", mode="citizen")
-    store.create(user_id="user-asha", mode="professional")
-    ravis = store.create(user_id="user-ravi", mode="citizen")
+    store.create(user_id="user-asha")
+    store.create(user_id="user-asha")
+    ravis = store.create(user_id="user-ravi")
 
     store.delete_all_for("user-asha")
 
@@ -60,7 +60,7 @@ class _SpyCipher:
 def test_turn_content_is_encrypted_before_it_is_stored_and_decrypted_on_read():
     cipher = _SpyCipher()
     store = InMemoryConversationStore(cipher=cipher)
-    convo = store.create(user_id="user-asha", mode="citizen")
+    convo = store.create(user_id="user-asha")
 
     store.append_turn(
         "user-asha",

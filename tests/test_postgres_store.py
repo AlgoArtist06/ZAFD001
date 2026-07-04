@@ -18,7 +18,8 @@ import sqlite3
 
 import pytest
 
-from rag.store import PostgresConversationStore, Turn
+from rag.domain.conversations import Turn
+from rag.infrastructure.persistence import PostgresConversationStore
 
 
 @pytest.fixture
@@ -33,33 +34,46 @@ def store(connect):
     return PostgresConversationStore(connect, dialect="sqlite")
 
 
-def test_a_new_conversation_records_its_owner_and_mode(store):
-    convo = store.create(user_id="user-asha", mode="professional")
+def test_a_new_conversation_records_its_owner(store):
+    convo = store.create(user_id="user-asha")
     assert convo.user_id == "user-asha"
-    assert convo.mode == "professional"
     assert convo.turns == []
 
 
 def test_conversations_are_listed_for_their_owner_newest_first(store):
-    first = store.create(user_id="user-asha", mode="citizen")
-    second = store.create(user_id="user-asha", mode="professional")
+    first = store.create(user_id="user-asha")
+    second = store.create(user_id="user-asha")
     listed = store.list_for("user-asha")
     assert [c.id for c in listed] == [second.id, first.id]
 
 
+def test_summaries_carry_the_first_turn_as_title(store):
+    convo = store.create("user-asha")
+    store.append_turn(
+        "user-asha", convo.id, Turn("first question", "first question", "ans", False)
+    )
+    store.append_turn("user-asha", convo.id, Turn("second", "second", "ans", False))
+    empty = store.create("user-asha")
+
+    summaries = {s.id: s for s in store.list_summaries("user-asha")}
+
+    assert summaries[convo.id].title == "first question"  # first turn, decrypted
+    assert summaries[empty.id].title == "New chat"  # no turns yet
+
+
 def test_one_user_never_sees_anothers_conversations(store):
-    store.create(user_id="user-asha", mode="citizen")
-    store.create(user_id="user-ravi", mode="citizen")
+    store.create(user_id="user-asha")
+    store.create(user_id="user-ravi")
     assert [c.user_id for c in store.list_for("user-asha")] == ["user-asha"]
 
 
 def test_a_user_cannot_load_another_users_conversation_by_id(store):
-    ashas = store.create(user_id="user-asha", mode="citizen")
+    ashas = store.create(user_id="user-asha")
     assert store.get("user-ravi", ashas.id) is None
 
 
 def test_appended_turns_accumulate_in_order(store):
-    convo = store.create(user_id="user-asha", mode="citizen")
+    convo = store.create(user_id="user-asha")
     store.append_turn("user-asha", convo.id, Turn("a", "a", "ans-a", False))
     store.append_turn("user-asha", convo.id, Turn("b", "b", "ans-b", False))
     assert [t.query for t in store.get("user-asha", convo.id).turns] == ["a", "b"]
@@ -71,8 +85,8 @@ def test_appending_to_a_missing_conversation_is_an_error(store):
 
 
 def test_a_user_can_delete_one_of_their_conversations(store):
-    keep = store.create(user_id="user-asha", mode="citizen")
-    drop = store.create(user_id="user-asha", mode="citizen")
+    keep = store.create(user_id="user-asha")
+    drop = store.create(user_id="user-asha")
 
     store.delete("user-asha", drop.id)
 
@@ -81,7 +95,7 @@ def test_a_user_can_delete_one_of_their_conversations(store):
 
 
 def test_a_user_cannot_delete_another_users_conversation(store):
-    ashas = store.create(user_id="user-asha", mode="citizen")
+    ashas = store.create(user_id="user-asha")
 
     store.delete("user-ravi", ashas.id)
 
@@ -89,9 +103,9 @@ def test_a_user_cannot_delete_another_users_conversation(store):
 
 
 def test_deleting_all_data_for_a_user_purges_only_their_conversations(store):
-    store.create(user_id="user-asha", mode="citizen")
-    store.create(user_id="user-asha", mode="professional")
-    ravis = store.create(user_id="user-ravi", mode="citizen")
+    store.create(user_id="user-asha")
+    store.create(user_id="user-asha")
+    ravis = store.create(user_id="user-ravi")
 
     store.delete_all_for("user-asha")
 
@@ -102,7 +116,7 @@ def test_deleting_all_data_for_a_user_purges_only_their_conversations(store):
 def test_history_survives_a_reload_and_is_visible_on_another_device(connect):
     # The Conversation is created and a turn recorded on "this device".
     on_this_device = PostgresConversationStore(connect, dialect="sqlite")
-    convo = on_this_device.create(user_id="user-asha", mode="citizen")
+    convo = on_this_device.create(user_id="user-asha")
     on_this_device.append_turn(
         "user-asha", convo.id, Turn("theft?", "theft?", "BNS 303 ...", False)
     )
@@ -112,7 +126,6 @@ def test_history_survives_a_reload_and_is_visible_on_another_device(connect):
     on_another_device = PostgresConversationStore(connect, dialect="sqlite")
     restored = on_another_device.get("user-asha", convo.id)
     assert restored is not None
-    assert restored.mode == "citizen"
     assert [t.query for t in restored.turns] == ["theft?"]
     assert [c.id for c in on_another_device.list_for("user-asha")] == [convo.id]
 
@@ -134,7 +147,7 @@ class _SpyCipher:
 def test_turn_content_is_encrypted_at_rest_and_decrypted_on_read(connect):
     cipher = _SpyCipher()
     store = PostgresConversationStore(connect, cipher=cipher, dialect="sqlite")
-    convo = store.create(user_id="user-asha", mode="citizen")
+    convo = store.create(user_id="user-asha")
     store.append_turn(
         "user-asha",
         convo.id,
@@ -164,7 +177,7 @@ def test_turn_content_is_encrypted_at_rest_and_decrypted_on_read(connect):
 
 def test_sensitive_content_never_reaches_the_logs(store, caplog):
     with caplog.at_level(logging.DEBUG):
-        convo = store.create(user_id="user-asha", mode="citizen")
+        convo = store.create(user_id="user-asha")
         store.append_turn(
             "user-asha",
             convo.id,

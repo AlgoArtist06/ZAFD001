@@ -30,9 +30,9 @@ class CoverageReport:
 
     @property
     def overall_coverage(self) -> float:
-        ingested = sum(a.ingested for a in self.per_act.values())
         target = sum(a.in_scope_target for a in self.per_act.values())
-        return ingested / target if target else 0.0
+        covered = sum(a.coverage * a.in_scope_target for a in self.per_act.values())
+        return covered / target if target else 0.0
 
     def meets_threshold(self, minimum: float = 0.80) -> bool:
         return self.overall_coverage >= minimum and all(
@@ -56,7 +56,9 @@ def build_coverage_report(
             in_scope_target=len(in_scope),
             official_total=official_total,
             coverage=len(covered) / len(in_scope) if in_scope else 0.0,
-            uncovered_remainder=official_total - len(ingested),
+            # Amended acts ingest lettered insertions (66C, 194B, ...) beyond
+            # the base published count, so the remainder floors at zero.
+            uncovered_remainder=max(0, official_total - len(ingested)),
             missing_sections=missing,
         )
     return CoverageReport(per_act=per_act)

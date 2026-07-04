@@ -65,10 +65,20 @@ def chunk_section(act: ParsedAct, section: Section, token_threshold: int) -> Lis
         ]
 
     children: List[Chunk] = []
+    # A chunk_id is the point's primary key in the vector store, so it must be
+    # unique. Sub-section labels can repeat within one section (e.g. a definitions
+    # section where many clauses carry an inner "(i)"), which would collide and
+    # silently overwrite points on load; disambiguate a repeated label with a
+    # positional suffix while the displayed sub_section keeps the real label.
+    seen: dict[str, int] = {}
     for sub in section.sub_sections:
+        seen[sub.label] = seen.get(sub.label, 0) + 1
+        unique_label = (
+            sub.label if seen[sub.label] == 1 else f"{sub.label}-{seen[sub.label]}"
+        )
         children.append(
             Chunk(
-                chunk_id=f"{parent_id}-{sub.label}",
+                chunk_id=f"{parent_id}-{unique_label}",
                 act_id=act.act_id,
                 section_number=section.section_number,
                 sub_section=sub.label,

@@ -10,9 +10,9 @@ queries.
 """
 import re
 
-from rag.answer import LegalAssistant
-from rag.eval import load_gold_cases, run_gold_eval
-from rag.multilingual import (
+from tests.doubles import offline_assistant
+from rag.services.eval import load_gold_cases, run_gold_eval
+from rag.domain.multilingual import (
     BilingualGlossary,
     confirmation_for,
     detect_language,
@@ -48,7 +48,7 @@ def test_intent_extraction_handles_code_mixing_keeping_latin_terms():
 
 
 def test_hindi_query_retrieves_over_english_corpus_and_answers_in_hindi(corpus):
-    assistant = LegalAssistant(corpus)
+    assistant = offline_assistant(corpus)
     result = assistant.answer("चोरी की सजा क्या है?")
     assert not result.refused
     assert result.language == "hi"
@@ -59,7 +59,7 @@ def test_hindi_query_retrieves_over_english_corpus_and_answers_in_hindi(corpus):
 
 
 def test_citation_anchor_stays_verbatim_english_in_a_hindi_answer(corpus):
-    assistant = LegalAssistant(corpus)
+    assistant = offline_assistant(corpus)
     result = assistant.answer("चोरी की सजा क्या है?")
     anchor = result.citations[0].anchor
     # The Citation Anchor (reference + Verbatim Text) is original English only.
@@ -73,25 +73,18 @@ def test_glossary_constrains_hindi_terminology_with_english_in_brackets(corpus):
     glossary = BilingualGlossary.load()
     criminal_hi = glossary.hindi_for("criminal law")
     assert criminal_hi  # the glossary is the source of the Hindi term
-    result = LegalAssistant(corpus).answer("चोरी की सजा क्या है?")
+    result = offline_assistant(corpus).answer("चोरी की सजा क्या है?")
     assert criminal_hi in result.explanation
     assert "(criminal law)" in result.explanation
 
 
 def test_confirmation_step_fires_for_ambiguous_citizen_query(corpus):
-    assistant = LegalAssistant(corpus)
+    assistant = offline_assistant(corpus)
     result = assistant.answer("मेरे अधिकार क्या हैं?")
     assert result.needs_confirmation
     assert not result.citations
     # The clarifying check is posed in the user's language.
     assert _DEVANAGARI.search(result.confirmation)
-
-
-def test_confirmation_step_does_not_fire_in_professional_mode(corpus):
-    assistant = LegalAssistant(corpus)
-    convo = assistant.start_conversation(mode="professional")
-    result = convo.ask("मेरे अधिकार क्या हैं?")
-    assert not result.needs_confirmation
 
 
 def test_confirmation_for_only_triggers_on_ambiguous_only_queries():
@@ -104,7 +97,7 @@ def test_confirmation_for_only_triggers_on_ambiguous_only_queries():
 def test_hindi_gold_subset_runs_and_every_case_holds(corpus):
     cases = load_gold_cases(language="hi")
     assert cases, "expected a Hindi gold subset"
-    report = run_gold_eval(LegalAssistant(corpus), cases)
+    report = run_gold_eval(offline_assistant(corpus), cases)
     assert report.total == len(cases)
     assert report.failures == []
     assert report.passed == report.total
