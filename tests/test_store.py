@@ -28,6 +28,17 @@ def test_conversations_are_listed_for_their_owner_newest_first():
     assert [c.id for c in listed] == [second.id, first.id]
 
 
+def test_citations_round_trip_with_a_turn():
+    store = InMemoryConversationStore()
+    convo = store.create(user_id="user-asha")
+    cited = [{"reference": "BNS (2023), Section 303", "verbatim": "Whoever...", "url": "https://x"}]
+    store.append_turn(
+        "user-asha", convo.id, Turn("theft?", "theft?", "ans", False, citations=cited)
+    )
+    loaded = store.get("user-asha", convo.id)
+    assert loaded.turns[0].citations == cited
+
+
 def test_summaries_carry_the_first_turn_as_title():
     store = InMemoryConversationStore()
     convo = store.create(user_id="user-asha")

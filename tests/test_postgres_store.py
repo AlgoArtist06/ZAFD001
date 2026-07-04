@@ -19,6 +19,7 @@ import sqlite3
 import pytest
 
 from rag.domain.conversations import Turn
+from rag.domain.privacy import Cipher
 from rag.infrastructure.persistence import PostgresConversationStore
 
 
@@ -45,6 +46,60 @@ def test_conversations_are_listed_for_their_owner_newest_first(store):
     second = store.create(user_id="user-asha")
     listed = store.list_for("user-asha")
     assert [c.id for c in listed] == [second.id, first.id]
+
+
+def test_citations_round_trip_with_a_turn(store):
+    convo = store.create(user_id="user-asha")
+    cited = [{"reference": "BNS (2023), Section 303", "verbatim": "Whoever...", "url": "https://x"}]
+    store.append_turn(
+        "user-asha", convo.id, Turn("theft?", "theft?", "ans", False, citations=cited)
+    )
+    loaded = store.get("user-asha", convo.id)
+    assert loaded.turns[0].citations == cited
+
+
+def test_pre_citations_database_is_migrated_and_old_rows_still_read(connect):
+    """A database created before the citations column gains it on open, and its
+    existing rows read back with no citations rather than failing decryption."""
+    cipher = Cipher()
+    conn = connect()
+    # The dual-mode-era schema: a NOT NULL mode column the code no longer fills.
+    conn.execute(
+        "CREATE TABLE conversations ("
+        " seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE,"
+        " user_id TEXT NOT NULL, mode TEXT NOT NULL DEFAULT 'citizen')"
+    )
+    conn.execute(
+        "CREATE TABLE turns ("
+        " seq INTEGER PRIMARY KEY AUTOINCREMENT, conversation_id TEXT NOT NULL,"
+        " query TEXT NOT NULL, resolved TEXT NOT NULL, answer TEXT NOT NULL,"
+        " refused INTEGER NOT NULL)"
+    )
+    conn.execute(
+        "INSERT INTO conversations (id, user_id) VALUES ('conv-old', 'user-asha')"
+    )
+    conn.execute(
+        "INSERT INTO turns (conversation_id, query, resolved, answer, refused) "
+        "VALUES (?, ?, ?, ?, 0)",
+        ("conv-old", cipher.encrypt("theft?"), cipher.encrypt("theft?"), cipher.encrypt("BNS 303")),
+    )
+    conn.commit()
+    conn.close()
+
+    # Opening the store migrates the schema; the old row reads back whole.
+    store = PostgresConversationStore(connect, dialect="sqlite")
+    loaded = store.get("user-asha", "conv-old")
+    assert loaded.turns[0].query == "theft?"
+    assert loaded.turns[0].citations == []
+
+    # And new turns with citations persist alongside the migrated row.
+    cited = [{"reference": "r", "verbatim": "v", "url": "u"}]
+    store.append_turn("user-asha", "conv-old", Turn("q", "q", "a", False, citations=cited))
+    assert store.get("user-asha", "conv-old").turns[1].citations == cited
+
+    # The dropped mode column no longer blocks creating a new Conversation.
+    fresh = store.create(user_id="user-asha")
+    assert fresh.id
 
 
 def test_summaries_carry_the_first_turn_as_title(store):

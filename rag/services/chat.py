@@ -143,11 +143,28 @@ class ChatShell:
         resolved: str,
         result: GroundedAnswer,
     ) -> None:
-        """Record one completed turn: the user's words, the rewrite, the answer."""
+        """Record one completed turn: the user's words, the rewrite, the answer.
+
+        The verified Citations persist in their wire form so a reloaded
+        Conversation shows the same verbatim statutory text that streamed live.
+        """
         self._store.append_turn(
             record.user_id,
             record.id,
-            Turn(query=query, resolved=resolved, answer=result.text, refused=result.refused),
+            Turn(
+                query=query,
+                resolved=resolved,
+                answer=result.text,
+                refused=result.refused,
+                citations=[
+                    {
+                        "reference": c.reference,
+                        "verbatim": c.verbatim_text,
+                        "url": c.source_url,
+                    }
+                    for c in result.citations
+                ],
+            ),
         )
 
     def send(
