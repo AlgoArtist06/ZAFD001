@@ -23,6 +23,7 @@ class SampleSection:
 def sample_sections(result: IngestionResult, limit: int = 50) -> List[SampleSection]:
     """One row per ingested statutory section (children folded into their parent)."""
     by_section: Dict[tuple, SampleSection] = {}
+    by_act: Dict[str, List[SampleSection]] = {}
     for chunk in result.chunks:
         if chunk.section_number is None:
             continue  # schemes are summarised separately
@@ -35,7 +36,14 @@ def sample_sections(result: IngestionResult, limit: int = 50) -> List[SampleSect
             )
         else:
             by_section[key].verbatim += " " + chunk.text
-    return list(by_section.values())[:limit]
+    for (act_id, _), sample in by_section.items():
+        by_act.setdefault(act_id, []).append(sample)
+    return [
+        samples[index]
+        for index in range(max(map(len, by_act.values()), default=0))
+        for samples in by_act.values()
+        if index < len(samples)
+    ][:limit]
 
 
 def build_checkpoint(result: IngestionResult) -> str:

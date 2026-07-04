@@ -54,6 +54,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  document.documentElement.classList.remove("dark");
 });
 
 async function ask(question: string) {
@@ -64,6 +65,15 @@ async function ask(question: string) {
 }
 
 describe("Shell", () => {
+  it("toggles dark mode", async () => {
+    const user = userEvent.setup();
+    render(<Shell />);
+
+    await user.click(screen.getByRole("button", { name: /use dark mode/i }));
+
+    expect(document.documentElement).toHaveClass("dark");
+  });
+
   it("renders the asked question and streams the assistant answer into the thread", async () => {
     render(<Shell />);
     await ask("What is the punishment for theft?");
@@ -193,25 +203,18 @@ describe("Shell", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("deletes the account only after confirmation and signs out", async () => {
+  it("signs out from the sidebar without touching the account", async () => {
     const signOut = vi.fn(async () => undefined);
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     const user = userEvent.setup();
-    render(
-      <Shell getToken={async () => "sess_asha"} signOut={signOut} />,
-    );
+    render(<Shell getToken={async () => "sess_asha"} signOut={signOut} />);
 
-    await user.click(screen.getByRole("button", { name: /delete account/i }));
+    await user.click(screen.getByRole("button", { name: /sign out/i }));
 
-    expect(confirm).toHaveBeenCalledWith(expect.stringMatching(/cannot be undone/i));
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringMatching(/\/api\/account$/),
-      expect.objectContaining({
-        method: "DELETE",
-        headers: expect.objectContaining({ Authorization: "Bearer sess_asha" }),
-      }),
-    );
     expect(signOut).toHaveBeenCalledOnce();
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.stringMatching(/\/api\/account$/),
+      expect.anything(),
+    );
   });
 
   it("sends prior turns as context so a follow-up builds on the Conversation", async () => {
@@ -235,78 +238,6 @@ describe("Shell", () => {
     )!;
     const headers = answerCall[1].headers;
     expect(headers.Authorization).toBe("Bearer sess_asha");
-  });
-
-  it("routes a new Conversation through the dual-mode seam in Citizen mode by default", async () => {
-    render(<Shell />);
-    await ask("What is the punishment for theft?");
-
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.mode).toBe("citizen");
-  });
-
-  it("routes through Professional mode when it is chosen for a new Conversation", async () => {
-    const user = userEvent.setup();
-    render(<Shell />);
-
-    await user.click(screen.getByRole("radio", { name: /professional/i }));
-    await user.type(screen.getByLabelText(/your legal question/i), "Define abetment");
-    await user.click(screen.getByRole("button", { name: /^ask$/i }));
-
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.mode).toBe("professional");
-  });
-
-  it("shows each Conversation's mode as a badge in the sidebar", async () => {
-    const user = userEvent.setup();
-    render(<Shell />);
-
-    await user.click(screen.getByRole("radio", { name: /professional/i }));
-    await ask("Define abetment");
-
-    const sidebar = screen.getByRole("complementary");
-    expect(within(sidebar).getByText(/professional/i)).toBeInTheDocument();
-  });
-
-  it("locks the mode once the Conversation has a message", async () => {
-    render(<Shell />);
-    await ask("What is the punishment for theft?");
-    await within(screen.getByRole("log")).findByText(/The law says X\./);
-
-    // The selector is gone, so the chosen mode cannot be changed mid-Conversation.
-    expect(screen.queryByRole("radiogroup", { name: /answer mode/i })).not.toBeInTheDocument();
-  });
-
-  it("routes a question through the multilingual seam in English by default", async () => {
-    render(<Shell />);
-    await ask("What is the punishment for theft?");
-
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.language).toBe("en");
-  });
-
-  it("offers exactly English, Hindi, Tamil, and Gujarati as answer languages", () => {
-    render(<Shell />);
-
-    const selector = screen.getByRole("combobox", { name: /answer language/i });
-    const options = within(selector)
-      .getAllByRole("option")
-      .map((option) => option.textContent);
-    expect(options).toEqual(["English", "हिन्दी", "தமிழ்", "ગુજરાતી"]);
-  });
-
-  it("passes the chosen language through to the multilingual seam", async () => {
-    const user = userEvent.setup();
-    render(<Shell />);
-
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: /answer language/i }),
-      "hi",
-    );
-    await ask("What is the punishment for theft?");
-
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.language).toBe("hi");
   });
 
   it("does not carry memory across when a new Conversation is started", async () => {

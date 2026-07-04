@@ -6,7 +6,7 @@ the input and to carry the former number forward for annotation - never as a
 retrieval source.
 """
 from ingestion.mapping import load_ipc_bns_mapping
-from rag.recognition import recognize_ipc
+from rag.domain.recognition import recognize_ipc
 
 import json
 from pathlib import Path

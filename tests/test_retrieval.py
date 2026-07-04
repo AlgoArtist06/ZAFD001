@@ -1,10 +1,12 @@
 """Hybrid retrieval routed by Covered Domain."""
 from ingestion.models import ActType
-from ingestion.vectorstore import DeterministicEmbedder, QdrantVectorStore
+from ingestion.vectorstore import QdrantVectorStore
 
-from rag.domain import route_domains
-from rag.expansion import expand
-from rag.retrieval import HybridRetriever
+from tests.doubles import HashEmbedder
+
+from rag.domain.routing import route_domains
+from rag.domain.expansion import expand
+from rag.domain.retrieval import HybridRetriever
 
 
 def test_consumer_query_routes_to_consumer_domain_only():
@@ -14,7 +16,7 @@ def test_consumer_query_routes_to_consumer_domain_only():
 
 
 def test_routing_filters_criminal_sections_out_of_a_consumer_query(corpus):
-    retriever = HybridRetriever(corpus)
+    retriever = HybridRetriever(corpus, embedder=HashEmbedder())
     domains = route_domains("How do I file a consumer complaint about goods?")
     hits = retriever.retrieve("How do I file a consumer complaint about goods?", domains)
     assert hits
@@ -22,7 +24,7 @@ def test_routing_filters_criminal_sections_out_of_a_consumer_query(corpus):
 
 
 def test_hybrid_uses_both_keyword_and_vector_signal(corpus):
-    retriever = HybridRetriever(corpus)
+    retriever = HybridRetriever(corpus, embedder=HashEmbedder())
     hits = retriever.retrieve("theft of movable property", [ActType.CRIMINAL])
     top = hits[0]
     assert top.chunk.section_number == "303"
@@ -33,7 +35,7 @@ def test_hybrid_uses_both_keyword_and_vector_signal(corpus):
 def test_qdrant_retrieval_keeps_hybrid_scores_and_domain_filtering(corpus):
     from qdrant_client import QdrantClient
 
-    embedder = DeterministicEmbedder()
+    embedder = HashEmbedder()
     store = QdrantVectorStore(
         embedder=embedder,
         collection="retrieval_test",

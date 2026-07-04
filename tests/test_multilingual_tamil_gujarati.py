@@ -13,9 +13,9 @@ source, and the gold eval set gets extra per-language attention.
 """
 import re
 
-from rag.answer import LegalAssistant
-from rag.eval import load_gold_cases, run_gold_eval
-from rag.multilingual import (
+from tests.doubles import offline_assistant
+from rag.services.eval import load_gold_cases, run_gold_eval
+from rag.domain.multilingual import (
     BilingualGlossary,
     confirmation_for,
     detect_language,
@@ -61,7 +61,7 @@ def test_intent_extraction_handles_code_mixing_in_tamil_and_gujarati():
 
 
 def test_tamil_query_retrieves_over_english_corpus_and_answers_in_tamil(corpus):
-    result = LegalAssistant(corpus).answer("திருட்டுக்கான தண்டனை என்ன?")
+    result = offline_assistant(corpus).answer("திருட்டுக்கான தண்டனை என்ன?")
     assert not result.refused
     assert result.language == "ta"
     # Reasoning ran over the English corpus: the correct BNS section is cited.
@@ -71,7 +71,7 @@ def test_tamil_query_retrieves_over_english_corpus_and_answers_in_tamil(corpus):
 
 
 def test_gujarati_query_retrieves_over_english_corpus_and_answers_in_gujarati(corpus):
-    result = LegalAssistant(corpus).answer("ચોરી માટે સજા શું છે?")
+    result = offline_assistant(corpus).answer("ચોરી માટે સજા શું છે?")
     assert not result.refused
     assert result.language == "gu"
     assert any(c.section_number == "303" for c in result.citations)
@@ -79,7 +79,7 @@ def test_gujarati_query_retrieves_over_english_corpus_and_answers_in_gujarati(co
 
 
 def test_citation_anchor_stays_verbatim_english_for_tamil_and_gujarati(corpus):
-    assistant = LegalAssistant(corpus)
+    assistant = offline_assistant(corpus)
     for query, script in (
         ("திருட்டுக்கான தண்டனை என்ன?", _TAMIL),
         ("ચોરી માટે સજા શું છે?", _GUJARATI),
@@ -91,7 +91,7 @@ def test_citation_anchor_stays_verbatim_english_for_tamil_and_gujarati(corpus):
 
 
 def test_critical_terms_show_target_language_with_english_in_brackets(corpus):
-    assistant = LegalAssistant(corpus)
+    assistant = offline_assistant(corpus)
     glossary = BilingualGlossary.load()
 
     tamil = assistant.answer("திருட்டுக்கான தண்டனை என்ன?")
@@ -106,7 +106,7 @@ def test_critical_terms_show_target_language_with_english_in_brackets(corpus):
 
 
 def test_confirmation_step_fires_in_tamil_and_gujarati(corpus):
-    assistant = LegalAssistant(corpus)
+    assistant = offline_assistant(corpus)
 
     tamil = assistant.answer("என் உரிமைகள் என்ன?")
     assert tamil.needs_confirmation
@@ -119,13 +119,8 @@ def test_confirmation_step_fires_in_tamil_and_gujarati(corpus):
     assert _GUJARATI.search(gujarati.confirmation)
 
 
-def test_confirmation_step_does_not_fire_in_professional_mode_tamil(corpus):
-    convo = LegalAssistant(corpus).start_conversation(mode="professional")
-    assert not convo.ask("என் உரிமைகள் என்ன?").needs_confirmation
-
-
 def test_refusal_is_returned_in_the_users_language(corpus):
-    assistant = LegalAssistant(corpus)
+    assistant = offline_assistant(corpus)
     # An out-of-scope query (no grounded chunk) refuses in the user's language.
     tamil = assistant.answer("சிறந்த பிரியாணி செய்முறை என்ன?")
     assert tamil.refused
@@ -146,7 +141,7 @@ def test_confirmation_for_resolves_clarifying_text_per_language():
 def test_tamil_gold_subset_runs_and_every_case_holds(corpus):
     cases = load_gold_cases(language="ta")
     assert cases, "expected a Tamil gold subset"
-    report = run_gold_eval(LegalAssistant(corpus), cases)
+    report = run_gold_eval(offline_assistant(corpus), cases)
     assert report.total == len(cases)
     assert report.failures == []
     assert report.passed == report.total
@@ -155,7 +150,7 @@ def test_tamil_gold_subset_runs_and_every_case_holds(corpus):
 def test_gujarati_gold_subset_runs_and_every_case_holds(corpus):
     cases = load_gold_cases(language="gu")
     assert cases, "expected a Gujarati gold subset"
-    report = run_gold_eval(LegalAssistant(corpus), cases)
+    report = run_gold_eval(offline_assistant(corpus), cases)
     assert report.total == len(cases)
     assert report.failures == []
     assert report.passed == report.total

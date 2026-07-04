@@ -2,14 +2,11 @@
 
 The pipeline depends on two small protocols - an embedder and a vector store -
 so the production backend (FastEmbed BAAI/bge-base-en-v1.5 + Qdrant) can be
-swapped in without touching any caller. The default in-repo implementation is
-fully offline and deterministic so the Seam 1 suite needs no services.
+swapped in without touching any caller. Embeddings are always real (FastEmbed);
+tests inject their own doubles - the product has no offline mode (ADR 0010).
 """
 from __future__ import annotations
 
-import hashlib
-import math
-import re
 import uuid
 from dataclasses import asdict, dataclass
 from datetime import date
@@ -23,35 +20,10 @@ from ingestion.models import (
     ProvenanceRecord,
 )
 
-_TOKEN_RE = re.compile(r"[a-z0-9]+")
-
-
 class Embedder(Protocol):
     dim: int
 
     def embed(self, text: str) -> List[float]: ...
-
-
-class DeterministicEmbedder:
-    """Hashing bag-of-words embedder with L2-normalised vectors.
-
-    Good enough for a keyword-overlap retrieval smoke test; carries no model
-    weights and makes no network calls.
-    """
-
-    def __init__(self, dim: int = 512):
-        self.dim = dim
-
-    def embed(self, text: str) -> List[float]:
-        vec = [0.0] * self.dim
-        for token in _TOKEN_RE.findall(text.lower()):
-            digest = hashlib.md5(token.encode("utf-8")).hexdigest()
-            idx = int(digest, 16) % self.dim
-            vec[idx] += 1.0
-        norm = math.sqrt(sum(v * v for v in vec))
-        if norm:
-            vec = [v / norm for v in vec]
-        return vec
 
 
 class FastEmbedEmbedder:
@@ -103,6 +75,13 @@ class InMemoryVectorStore:
         for chunk in chunks:
             self._items.append((self._embedder.embed(chunk.text), chunk))
         return len(self._items)
+
+    def delete_acts(self, act_ids: Sequence[str]) -> None:
+        """Remove every chunk of the given acts (before re-loading them)."""
+        gone = set(act_ids)
+        self._items = [
+            (vec, chunk) for vec, chunk in self._items if chunk.act_id not in gone
+        ]
 
     def count(self) -> int:
         return len(self._items)
@@ -162,6 +141,11 @@ class QdrantVectorStore:
         self._collection = collection
         self._client = client or QdrantClient(url=url, api_key=api_key)
 
+    # Qdrant rejects a single request larger than 32 MB. Verbatim statutory text
+    # makes each point large (tens of KB), so the whole corpus in one upsert
+    # exceeds that; batch it. 256 keeps a batch well under the limit.
+    _UPSERT_BATCH = 256
+
     def load(self, chunks: Sequence[Chunk]) -> int:
         from qdrant_client.models import Distance, PointStruct, VectorParams
 
@@ -170,24 +154,64 @@ class QdrantVectorStore:
                 collection_name=self._collection,
                 vectors_config=VectorParams(size=self._embedder.dim, distance=Distance.COSINE),
             )
-        self._client.upsert(
-            collection_name=self._collection,
-            points=[
-                PointStruct(
-                    id=str(uuid.uuid5(uuid.NAMESPACE_URL, chunk.chunk_id)),
-                    vector=self._embedder.embed(chunk.text),
-                    payload=_chunk_payload(chunk),
-                )
-                for chunk in chunks
-            ],
-            wait=True,
-        )
+        points = [
+            PointStruct(
+                id=str(uuid.uuid5(uuid.NAMESPACE_URL, chunk.chunk_id)),
+                vector=self._embedder.embed(chunk.text),
+                payload=_chunk_payload(chunk),
+            )
+            for chunk in chunks
+        ]
+        for start in range(0, len(points), self._UPSERT_BATCH):
+            self._client.upsert(
+                collection_name=self._collection,
+                points=points[start : start + self._UPSERT_BATCH],
+                wait=True,
+            )
         return self.count()
 
     def count(self) -> int:
         if not self._client.collection_exists(self._collection):
             return 0
         return self._client.count(collection_name=self._collection, exact=True).count
+
+    def delete_acts(self, act_ids: Sequence[str]) -> None:
+        """Remove every point of the given acts, so a re-load cannot leave a
+        renamed or removed section behind as a stale point."""
+        from qdrant_client.models import FieldCondition, Filter, FilterSelector, MatchAny
+
+        if not act_ids or not self._client.collection_exists(self._collection):
+            return
+        self._client.delete(
+            collection_name=self._collection,
+            points_selector=FilterSelector(
+                filter=Filter(
+                    must=[
+                        FieldCondition(
+                            key="chunk.act_id",
+                            match=MatchAny(any=list(act_ids)),
+                        )
+                    ]
+                )
+            ),
+            wait=True,
+        )
+
+    def fetch(self, chunk_ids: Sequence[str]) -> List[Chunk]:
+        """The stored chunks for the given ``chunk_id``s, skipping any missing.
+
+        Point ids are deterministic (uuid5 of the chunk id), so a chunk can be
+        looked up directly; the startup consistency check uses this to verify a
+        sample of the collection against the in-process corpus.
+        """
+        if not chunk_ids or not self._client.collection_exists(self._collection):
+            return []
+        points = self._client.retrieve(
+            collection_name=self._collection,
+            ids=[str(uuid.uuid5(uuid.NAMESPACE_URL, cid)) for cid in chunk_ids],
+            with_payload=True,
+        )
+        return [_chunk_from_payload(dict(p.payload or {})) for p in points]
 
     def search(
         self,
@@ -220,3 +244,26 @@ class QdrantVectorStore:
             SearchHit(chunk=_chunk_from_payload(dict(point.payload or {})), score=point.score)
             for point in points
         ]
+
+
+def create_embedder(config, dim=None) -> Embedder:
+    """The embedding seam: always FastEmbed - local, CPU, keyless, and real.
+
+    There is no offline stand-in (ADR 0010): retrieval quality is part of the
+    product's correctness, so a deterministic hashing embedder must never serve
+    answers. Tests inject their own doubles explicitly.
+    """
+    size = dim or config.embedding_dim
+    return FastEmbedEmbedder(config.embedding_model, size)
+
+
+def create_vector_store(config, embedder: Embedder) -> VectorStore:
+    """The vector-store seam: Qdrant when configured, in-memory otherwise."""
+    if config.vector_store_backend == "qdrant":
+        return QdrantVectorStore(
+            embedder=embedder,
+            url=config.qdrant_url,
+            api_key=config.qdrant_api_key,
+            collection=config.qdrant_collection,
+        )
+    return InMemoryVectorStore(embedder)

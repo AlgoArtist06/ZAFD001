@@ -14,18 +14,18 @@ import json
 
 from fastapi.testclient import TestClient
 
-from rag.accounts import SessionVerifier
-from rag.answer import LegalAssistant
-from rag.privacy import ConsentLedger
-from rag.fastapi_app import create_app
-from rag.store import InMemoryConversationStore
+from rag.domain.accounts import SessionVerifier
+from tests.doubles import offline_assistant
+from rag.domain.privacy import ConsentLedger
+from rag.api.app import create_app
+from rag.domain.conversations import InMemoryConversationStore
 
 
 def _app(corpus):
     """An app plus the seams its tests seed: a verifier and a consent ledger."""
     verifier = SessionVerifier()
     consent = ConsentLedger()
-    app = create_app(LegalAssistant(corpus), verifier=verifier, consent=consent)
+    app = create_app(offline_assistant(corpus), verifier=verifier, consent=consent)
     return TestClient(app), verifier, consent
 
 
@@ -36,6 +36,29 @@ def _client(corpus, user_id="user-asha"):
     consent.record(user_id)
     client.headers["Authorization"] = f"Bearer {token}"
     return client
+
+
+def test_healthz_is_open_and_reports_ok(corpus):
+    """The liveness probe needs no session and reports the process is serving."""
+    client, _, _ = _app(corpus)
+    response = client.get("/healthz")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_cors_is_pinned_to_the_configured_origin(corpus):
+    """When an origin is pinned, only it is echoed back, not a wildcard."""
+    app = create_app(
+        offline_assistant(corpus), allowed_origins=["https://legal-saathi.example"]
+    )
+    client = TestClient(app)
+    response = client.get(
+        "/healthz", headers={"Origin": "https://legal-saathi.example"}
+    )
+    assert (
+        response.headers["access-control-allow-origin"]
+        == "https://legal-saathi.example"
+    )
 
 
 def test_answer_requires_a_verified_session(corpus):
@@ -153,6 +176,50 @@ def test_consent_requires_a_session(corpus):
     assert client.post("/api/consent").status_code == 401
 
 
+def test_consent_status_lets_a_returning_user_skip_the_gate(corpus):
+    """GET /api/consent reports the signed-in user's recorded consent, so the
+    consent gate can skip itself instead of asking again on every page load."""
+    client, verifier, consent = _app(corpus)
+    token = verifier.sign_in("user-asha")
+    client.headers["Authorization"] = f"Bearer {token}"
+
+    before = client.get("/api/consent")
+    assert before.status_code == 200
+    assert before.json()["consented"] is False
+    assert before.json()["current_version"]
+
+    consent.record("user-asha")
+    after = client.get("/api/consent").json()
+    assert after["consented"] is True
+    assert after["notice_version"] == after["current_version"]
+
+
+def test_conversation_list_returns_only_the_signed_in_users_history(corpus):
+    """GET /api/conversations hydrates the sidebar: the user's Conversations,
+    newest first, and never another user's."""
+    verifier = SessionVerifier()
+    consent = ConsentLedger()
+    store = InMemoryConversationStore()
+    first = store.create("user-asha")
+    second = store.create("user-asha")
+    store.create("user-ravi")
+    client = TestClient(
+        create_app(
+            offline_assistant(corpus), verifier=verifier, consent=consent, store=store
+        )
+    )
+    token = verifier.sign_in("user-asha")
+
+    response = client.get(
+        "/api/conversations", headers={"Authorization": f"Bearer {token}"}
+    )
+
+    assert response.status_code == 200
+    listed = response.json()["conversations"]
+    assert [c["id"] for c in listed] == [second.id, first.id]
+    assert all(c["title"] for c in listed)
+
+
 def test_one_users_consent_does_not_admit_another(corpus):
     """Consent is per-user: Asha consenting does not let an un-consented Ravi
     through, so attribution never leaks across users."""
@@ -182,11 +249,11 @@ def test_delete_conversation_removes_only_the_signed_in_users_conversation(corpu
     verifier = SessionVerifier()
     consent = ConsentLedger()
     store = InMemoryConversationStore()
-    ashas = store.create("user-asha", "citizen")
-    ravis = store.create("user-ravi", "citizen")
+    ashas = store.create("user-asha")
+    ravis = store.create("user-ravi")
     client = TestClient(
         create_app(
-            LegalAssistant(corpus), verifier=verifier, consent=consent, store=store
+            offline_assistant(corpus), verifier=verifier, consent=consent, store=store
         )
     )
     token = verifier.sign_in("user-asha")
@@ -205,13 +272,13 @@ def test_delete_account_erases_the_signed_in_users_data_and_consent(corpus):
     verifier = SessionVerifier()
     consent = ConsentLedger()
     store = InMemoryConversationStore()
-    store.create("user-asha", "citizen")
-    ravis = store.create("user-ravi", "citizen")
+    store.create("user-asha")
+    ravis = store.create("user-ravi")
     consent.record("user-asha")
     consent.record("user-ravi")
     client = TestClient(
         create_app(
-            LegalAssistant(corpus), verifier=verifier, consent=consent, store=store
+            offline_assistant(corpus), verifier=verifier, consent=consent, store=store
         )
     )
     token = verifier.sign_in("user-asha")
@@ -233,14 +300,14 @@ def test_a_deleted_conversation_and_its_turns_cannot_be_reloaded(corpus):
     store = InMemoryConversationStore()
     client = TestClient(
         create_app(
-            LegalAssistant(corpus), verifier=verifier, consent=consent, store=store
+            offline_assistant(corpus), verifier=verifier, consent=consent, store=store
         )
     )
     token = verifier.sign_in("user-asha")
     consent.record("user-asha")
     client.headers["Authorization"] = f"Bearer {token}"
 
-    created = client.post("/api/conversations", json={"mode": "citizen"})
+    created = client.post("/api/conversations")
     conversation_id = created.json()["id"]
     answered = client.post(
         "/api/answer",

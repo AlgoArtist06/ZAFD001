@@ -1,0 +1,35 @@
+services:
+  # Security: bind published ports to loopback (never 0.0.0.0) and require an
+  # API key so the key the app already sends (QDRANT_API_KEY) is enforced.
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: legal-qdrant
+    environment:
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:?set QDRANT_API_KEY}
+    ports:
+      - "127.0.0.1:6333:6333"
+      - "127.0.0.1:6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    restart: unless-stopped
+
+
+  # Security: bind 5432 to loopback and take the password from the environment
+  # (set a strong unique POSTGRES_PASSWORD in .env; the fallback is dev-only).
+  postgres:
+    image: postgres:16
+    container_name: legal-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-legal_assistant}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+
+volumes:
+  qdrant_data:
+  postgres_data:

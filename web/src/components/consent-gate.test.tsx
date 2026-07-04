@@ -28,6 +28,30 @@ afterEach(() => {
 });
 
 describe("ConsentGate", () => {
+  it("skips the gate for a returning user whose consent is already recorded", async () => {
+    fetchMock.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (url.endsWith("/api/consent") && options?.method !== "POST") {
+        return {
+          ok: true,
+          json: async () => ({ consented: true, notice_version: "2026-06-29" }),
+        } as unknown as Response;
+      }
+      return {
+        ok: true,
+        json: async () => ({ notice: NOTICE, version: "2026-06-29" }),
+      } as unknown as Response;
+    });
+
+    render(
+      <ConsentGate getToken={async () => "sess_asha"}>
+        <p>chat shell</p>
+      </ConsentGate>,
+    );
+
+    expect(await screen.findByText("chat shell")).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+  });
+
   it("shows the privacy notice disclosing third-party-LLM processing and hides the app until consent", async () => {
     render(
       <ConsentGate getToken={async () => "sess_asha"}>
@@ -58,11 +82,11 @@ describe("ConsentGate", () => {
       expect(screen.getByText("chat shell")).toBeInTheDocument();
     });
 
-    const consentCall = fetchMock.mock.calls.find((call) =>
-      String(call[0]).endsWith("/api/consent"),
+    const consentCall = fetchMock.mock.calls.find(
+      (call) =>
+        String(call[0]).endsWith("/api/consent") && call[1]?.method === "POST",
     );
     expect(consentCall).toBeTruthy();
-    expect(consentCall![1].method).toBe("POST");
     expect(consentCall![1].headers.Authorization).toBe("Bearer sess_asha");
   });
 });

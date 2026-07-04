@@ -6,8 +6,8 @@ import pytest
 from config import load_config
 from ingestion.models import ActType
 from ingestion.pipeline import default_config, run_ingestion
-from rag.expansion import expand
-from rag.retrieval import HybridRetriever
+from rag.domain.expansion import expand
+from rag.domain.retrieval import HybridRetriever
 
 pytestmark = pytest.mark.skipif(
     not os.getenv("QDRANT_URL"), reason="QDRANT_URL is not configured"

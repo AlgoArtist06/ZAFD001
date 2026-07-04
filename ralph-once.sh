@@ -10,6 +10,20 @@ set -euo pipefail
 # This script picks the next `ready-for-agent` issue, implements it,
 # and marks it `done`. No GitHub issues, no `gh`/`jq` required.
 #
+# !! DANGER / SAFE-RUN NOTES (security finding H4) !!
+# This runs a coding agent with ALL safety gates OFF
+# (--dangerously-skip-permissions / --dangerously-bypass-approvals-and-sandbox)
+# on UNTRUSTED issue-file content. That is the tool's intended design, but it
+# means a malicious or accidental issue file is a path to arbitrary code
+# execution, and the agent inherits this process's environment (any sourced
+# .env secrets are in its reach).
+#   - Run ONLY in a disposable / sandboxed VM or container.
+#   - Use NO production credentials in the environment or in .env.
+#   - Auto-push is opt-in: set RALPH_AUTO_PUSH=1 to push (default: do not push,
+#     so unreviewed code cannot land on origin).
+#   - Set RALPH_REQUIRE_SANDBOX=1 to hard-refuse to run when live .env secrets
+#     are already exported into this environment.
+#
 # Exit codes:
 #   0  one issue implemented and committed
 #   2  no `ready-for-agent` issues remain (loop should stop)
@@ -19,6 +33,37 @@ set -euo pipefail
 READY_STATUS="ready-for-agent"
 DONE_STATUS="done"
 RALPH_AGENT="${RALPH_AGENT:-claude}"
+
+# -----------------------------
+# Guard against sourced live secrets (finding H4)
+#
+# The agent runs unsandboxed and inherits this environment. If a real .env
+# exists AND its variables are already exported here, they are in the agent's
+# reach. Warn (or hard-refuse with RALPH_REQUIRE_SANDBOX=1) and recommend a
+# disposable VM. ponytail: name-match heuristic; enough to catch a sourced .env.
+# -----------------------------
+if [ -f .env ]; then
+    LEAKED=""
+    while IFS= read -r name; do
+        if [ -n "${!name:-}" ]; then
+            LEAKED="$LEAKED $name"
+        fi
+    done < <(grep -E '^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*=' .env \
+                 | sed -E 's/^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)=.*/\1/')
+
+    if [ -n "$LEAKED" ]; then
+        echo
+        echo "WARNING: a real .env is present and these of its secrets are already"
+        echo "exported in this environment:${LEAKED}"
+        echo "The unsandboxed agent will INHERIT them. Run Ralph only in a disposable,"
+        echo "sandboxed VM/container with no production credentials."
+        if [ "${RALPH_REQUIRE_SANDBOX:-0}" = "1" ]; then
+            echo "RALPH_REQUIRE_SANDBOX=1 set; refusing to run."
+            exit 1
+        fi
+        echo
+    fi
+fi
 
 # -----------------------------
 # Ensure git repository exists
@@ -45,6 +90,12 @@ fi
 # Initial commit if necessary
 # -----------------------------
 if ! git rev-parse HEAD >/dev/null 2>&1; then
+    # B-C4: on a fresh init there is no .gitignore yet, so `git add .` could
+    # stage a live .env into the very first commit. Ensure .env is ignored
+    # first (this also protects every later commit the agent makes).
+    if [ ! -f .gitignore ] || ! grep -qxF '.env' .gitignore; then
+        printf '%s\n' '.env' '.env.*' '!.env.example' >> .gitignore
+    fi
     touch .gitkeep
     git add .
     git commit -m "chore: initial commit"
@@ -187,10 +238,14 @@ fi
 CURRENT_BRANCH=$(git branch --show-current)
 
 # -----------------------------
-# Push to the existing remote (best effort).
-# We never create a remote automatically.
+# Push to the existing remote (opt-in; finding H4).
+# Default is NOT to push, so unreviewed agent commits never land on origin
+# automatically. Set RALPH_AUTO_PUSH=1 to enable. We never create a remote.
 # -----------------------------
-if git remote get-url origin >/dev/null 2>&1; then
+if [ "${RALPH_AUTO_PUSH:-0}" != "1" ]; then
+    echo
+    echo "Skipping push (set RALPH_AUTO_PUSH=1 to enable). Commit is saved locally."
+elif git remote get-url origin >/dev/null 2>&1; then
     echo
     echo "Pushing latest commit..."
     if ! git push --set-upstream origin "$CURRENT_BRANCH"; then

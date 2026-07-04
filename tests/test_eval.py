@@ -5,8 +5,8 @@ asserts the correct section is cited, or that a Refusal fires for an out-of-scop
 or advice-seeking input. Here we load the English subset and require every case
 to hold against the offline corpus.
 """
-from rag.answer import LegalAssistant
-from rag.eval import (
+from tests.doubles import offline_assistant
+from rag.services.eval import (
     ENGLISH,
     SUPPORTED_LANGUAGES,
     load_gold_cases,
@@ -25,29 +25,11 @@ def test_english_gold_subset_is_non_empty():
 
 
 def test_gold_eval_runs_and_every_english_case_holds(corpus):
-    assistant = LegalAssistant(corpus)
+    assistant = offline_assistant(corpus)
     report = run_gold_eval(assistant, load_gold_cases(language=ENGLISH))
     assert report.total == len(load_gold_cases(language=ENGLISH))
     assert report.failures == []
     assert report.passed == report.total
-
-
-def test_each_mode_has_a_non_empty_gold_subset():
-    citizen = load_gold_cases(mode="citizen")
-    professional = load_gold_cases(mode="professional")
-    assert citizen and professional
-    assert all(c.mode == "citizen" for c in citizen)
-    assert all(c.mode == "professional" for c in professional)
-    # Professional cases must cover both a cited-section case and a Refusal case.
-    assert any(c.expected_section for c in professional)
-    assert any(c.expect_refusal for c in professional)
-
-
-def test_professional_gold_subset_every_case_holds(corpus):
-    cases = load_gold_cases(mode="professional")
-    report = run_gold_eval(LegalAssistant(corpus), cases)
-    assert report.total == len(cases)
-    assert report.failures == []
 
 
 def test_old_ipc_number_gold_case_resolves_to_current_bns(corpus):
@@ -55,14 +37,14 @@ def test_old_ipc_number_gold_case_resolves_to_current_bns(corpus):
     section, proving the IPC-to-BNS normalisation holds end to end."""
     cases = [c for c in load_gold_cases(language=ENGLISH) if "ipc" in c.query.lower()]
     assert cases, "expected a gold case covering an old IPC number"
-    report = run_gold_eval(LegalAssistant(corpus), cases)
+    report = run_gold_eval(offline_assistant(corpus), cases)
     assert report.failures == []
 
 
 def test_final_eval_covers_every_supported_language(corpus):
     """The final eval pass runs a non-empty gold subset for each of the four
     Supported Languages, not just English."""
-    report = run_final_eval(LegalAssistant(corpus))
+    report = run_final_eval(offline_assistant(corpus))
     assert set(report.by_language) == set(SUPPORTED_LANGUAGES)
     assert set(SUPPORTED_LANGUAGES) == {"en", "hi", "ta", "gu"}
     for language in SUPPORTED_LANGUAGES:
@@ -72,7 +54,7 @@ def test_final_eval_covers_every_supported_language(corpus):
 def test_final_eval_meets_the_accuracy_bar_for_each_language(corpus):
     """Every Supported Language's subset must clear the accuracy bar, and the
     final pass as a whole passes only when all of them do."""
-    report = run_final_eval(LegalAssistant(corpus))
+    report = run_final_eval(offline_assistant(corpus))
     for language in SUPPORTED_LANGUAGES:
         result = report.by_language[language]
         assert result.meets_bar, (
@@ -86,7 +68,7 @@ def test_final_eval_fails_when_a_language_misses_the_bar(corpus):
     """A pass that cannot fail proves nothing: an impossible bar of 100% with a
     deliberately wrong expectation must make that language miss the bar and the
     whole pass fail."""
-    from rag.eval import GoldCase
+    from rag.services.eval import GoldCase
 
     bogus = [
         GoldCase(
@@ -97,7 +79,7 @@ def test_final_eval_fails_when_a_language_misses_the_bar(corpus):
             expected_act_id="bns",
         )
     ]
-    report = run_final_eval(LegalAssistant(corpus), cases_by_language={"ta": bogus}, bar=1.0)
+    report = run_final_eval(offline_assistant(corpus), cases_by_language={"ta": bogus}, bar=1.0)
     assert not report.by_language["ta"].meets_bar
     assert not report.passed
 
@@ -105,9 +87,9 @@ def test_final_eval_fails_when_a_language_misses_the_bar(corpus):
 def test_gold_eval_catches_a_wrong_section(corpus):
     """A harness that cannot fail proves nothing: a case expecting the wrong
     section must be reported as a failure, not a pass."""
-    from rag.eval import GoldCase
+    from rag.services.eval import GoldCase
 
-    assistant = LegalAssistant(corpus)
+    assistant = offline_assistant(corpus)
     bogus = GoldCase(
         id="theft-wrong-section",
         query="What is the punishment for theft of movable property?",

@@ -12,7 +12,7 @@ import json
 import re
 
 from config import load_config
-from rag.answer import LegalAssistant
+from rag.composition import build_assistant
 
 _DEVANAGARI = re.compile(r"[ऀ-ॿ]")
 _TAMIL = re.compile(r"[஀-௿]")
@@ -20,17 +20,16 @@ _GUJARATI = re.compile(r"[઀-૿]")
 
 
 class _Response:
+    status_code = 200
+
     def __init__(self, payload):
         self._payload = payload
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
+    def raise_for_status(self):
         pass
 
-    def read(self):
-        return json.dumps(self._payload).encode()
+    def json(self):
+        return self._payload
 
 
 def _completion(content):
@@ -55,10 +54,9 @@ def _is_intent_request(payload):
 def test_code_mixed_query_is_llm_normalized_then_answered_in_hindi(corpus, monkeypatch):
     payloads = []
 
-    def respond(request, timeout):
-        payload = json.loads(request.data)
-        payloads.append(payload)
-        if _is_intent_request(payload):
+    def respond(url, json=None, headers=None, timeout=None):
+        payloads.append(json)
+        if _is_intent_request(json):
             return _completion(
                 {"language": "hi", "english_query": "theft of mobile punishment"}
             )
@@ -69,10 +67,10 @@ def test_code_mixed_query_is_llm_normalized_then_answered_in_hindi(corpus, monke
             )
         )
 
-    monkeypatch.setattr("urllib.request.urlopen", respond)
+    monkeypatch.setattr("httpx.post", respond)
     config = load_config({"LLM_API_KEY": "test-key"})
 
-    result = LegalAssistant(corpus, app_config=config).answer(
+    result = build_assistant(corpus, config).answer(
         "मेरा mobile चोरी हो गया, सजा क्या है"
     )
 
@@ -93,17 +91,16 @@ def test_code_mixed_query_is_llm_normalized_then_answered_in_hindi(corpus, monke
 
 
 def _answer_through_llm(corpus, monkeypatch, query, language, script_explanation):
-    def respond(request, timeout):
-        payload = json.loads(request.data)
-        if _is_intent_request(payload):
+    def respond(url, json=None, headers=None, timeout=None):
+        if _is_intent_request(json):
             return _completion(
                 {"language": language, "english_query": "theft punishment"}
             )
         return _completion(_theft_draft(script_explanation))
 
-    monkeypatch.setattr("urllib.request.urlopen", respond)
+    monkeypatch.setattr("httpx.post", respond)
     config = load_config({"LLM_API_KEY": "test-key"})
-    return LegalAssistant(corpus, app_config=config).answer(query)
+    return build_assistant(corpus, config).answer(query)
 
 
 def test_tamil_query_is_llm_normalized_then_answered_in_tamil(corpus, monkeypatch):
@@ -146,10 +143,9 @@ def test_english_query_skips_the_intent_model_and_keeps_pipeline_offline(
     original English query before anything reaches retrieval."""
     seen = []
 
-    def respond(request, timeout):
-        payload = json.loads(request.data)
-        seen.append(payload)
-        assert not _is_intent_request(payload), "English query must skip intent LLM"
+    def respond(url, json=None, headers=None, timeout=None):
+        seen.append(json)
+        assert not _is_intent_request(json), "English query must skip intent LLM"
         return _completion(
             _theft_draft(
                 "Theft is the dishonest taking of movable property "
@@ -157,9 +153,9 @@ def test_english_query_skips_the_intent_model_and_keeps_pipeline_offline(
             )
         )
 
-    monkeypatch.setattr("urllib.request.urlopen", respond)
+    monkeypatch.setattr("httpx.post", respond)
     config = load_config({"LLM_API_KEY": "test-key"})
-    result = LegalAssistant(corpus, app_config=config).answer(
+    result = build_assistant(corpus, config).answer(
         "What is the punishment for theft of movable property?"
     )
     assert result.refused is False

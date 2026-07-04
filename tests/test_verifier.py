@@ -1,15 +1,16 @@
 """Citation verifier rejects any section not present in the retrieved chunks."""
 from ingestion.models import ActType
 
-from rag.citation import Citation
-from rag.domain import route_domains
-from rag.expansion import expand
-from rag.retrieval import HybridRetriever
-from rag.verifier import verify_citations
+from rag.domain.citation import Citation
+from rag.domain.routing import route_domains
+from rag.domain.expansion import expand
+from rag.domain.retrieval import HybridRetriever
+from rag.domain.verifier import verify_citations
+from tests.doubles import HashEmbedder
 
 
 def _sections(corpus, query, domains=None):
-    hits = HybridRetriever(corpus).retrieve(query, domains or route_domains(query))
+    hits = HybridRetriever(corpus, embedder=HashEmbedder()).retrieve(query, domains or route_domains(query))
     return expand(hits, corpus)
 
 

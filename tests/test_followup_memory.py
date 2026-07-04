@@ -7,12 +7,12 @@ pipeline (retrieval, parent expansion, grounding, citation verification,
 guardrails) over it. Context lives inside one Conversation only and is never
 carried across Conversations.
 """
-from rag.answer import LegalAssistant
-from rag.eval import ENGLISH, load_gold_cases, run_gold_eval
+from tests.doubles import offline_assistant
+from rag.services.eval import ENGLISH, load_gold_cases, run_gold_eval
 
 
 def test_dependent_followup_is_answered_using_prior_turn(corpus):
-    convo = LegalAssistant(corpus).start_conversation()
+    convo = offline_assistant(corpus).start_conversation()
     convo.ask("Someone cheated me by fraud and took my property dishonestly")
     # "it" refers back to the cheating asked about a moment ago.
     followup = convo.ask("What is the punishment for it?")
@@ -23,12 +23,12 @@ def test_dependent_followup_is_answered_using_prior_turn(corpus):
 def test_same_followup_refuses_without_conversation_context(corpus):
     # Run on its own the dependent follow-up has no statutory content to ground
     # on, so it is refused - proving the in-Conversation answer came from memory.
-    result = LegalAssistant(corpus).answer("What is the punishment for it?")
+    result = offline_assistant(corpus).answer("What is the punishment for it?")
     assert result.refused is True
 
 
 def test_context_is_not_shared_across_conversations(corpus):
-    assistant = LegalAssistant(corpus)
+    assistant = offline_assistant(corpus)
     first = assistant.start_conversation()
     first.ask("Someone cheated me by fraud and took my property dishonestly")
 
@@ -40,7 +40,7 @@ def test_context_is_not_shared_across_conversations(corpus):
 
 
 def test_a_self_contained_turn_is_unaffected_by_memory(corpus):
-    convo = LegalAssistant(corpus).start_conversation()
+    convo = offline_assistant(corpus).start_conversation()
     convo.ask("What protects my life and personal liberty?")
     # A fully self-contained second question is answered on its own merits, not
     # contaminated by the unrelated prior turn.
@@ -49,7 +49,7 @@ def test_a_self_contained_turn_is_unaffected_by_memory(corpus):
 
 
 def test_answer_keeps_the_users_own_words_not_the_rewrite(corpus):
-    convo = LegalAssistant(corpus).start_conversation()
+    convo = offline_assistant(corpus).start_conversation()
     convo.ask("Someone cheated me by fraud and took my property dishonestly")
     followup = convo.ask("What is the punishment for it?")
     assert followup.query == "What is the punishment for it?"
@@ -60,5 +60,5 @@ def test_multi_turn_gold_case_exists_and_holds(corpus):
     Conversation and must cite the right section on the final turn."""
     multi_turn = [c for c in load_gold_cases(language=ENGLISH) if c.turns]
     assert multi_turn, "expected a multi-turn gold case"
-    report = run_gold_eval(LegalAssistant(corpus), multi_turn)
+    report = run_gold_eval(offline_assistant(corpus), multi_turn)
     assert report.failures == []

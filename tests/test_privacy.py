@@ -10,7 +10,7 @@ out of plaintext logs. These are the deterministic offline stand-ins for those
 guarantees; production swaps real key management and a managed datastore behind
 the same seams.
 """
-from rag.privacy import (
+from rag.domain.privacy import (
     NOTICE_VERSION,
     Cipher,
     ConsentLedger,
@@ -19,7 +19,7 @@ from rag.privacy import (
 
 
 def test_the_privacy_notice_says_what_is_stored_and_why():
-    from rag.privacy import PRIVACY_NOTICE
+    from rag.domain.privacy import PRIVACY_NOTICE
 
     text = PRIVACY_NOTICE.lower()
     assert "stored" in text or "store" in text
@@ -27,7 +27,7 @@ def test_the_privacy_notice_says_what_is_stored_and_why():
 
 
 def test_the_privacy_notice_discloses_third_party_llm_and_the_trade_off():
-    from rag.privacy import PRIVACY_NOTICE
+    from rag.domain.privacy import PRIVACY_NOTICE
 
     text = PRIVACY_NOTICE.lower()
     # The disclosure the DPDP alignment turns on: queries leave to a third party.

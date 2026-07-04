@@ -1,9 +1,9 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-// Only the Clerk-hosted auth flows are reachable without a session; every other
-// route - the chat shell above all - is protected at the edge, so an
-// unauthenticated visitor is bounced to sign-in before the app renders.
-const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"]);
+// The landing page and the Clerk-hosted auth flows are reachable without a
+// session; every other route - the chat shell above all - is protected at the
+// edge, so an unauthenticated visitor is bounced to sign-in first.
+const isPublicRoute = createRouteMatcher(["/", "/sign-in(.*)", "/sign-up(.*)"]);
 
 export default clerkMiddleware(async (auth, request) => {
   if (!isPublicRoute(request)) {

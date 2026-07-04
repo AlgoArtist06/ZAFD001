@@ -1,7 +1,7 @@
 # Postgres setup for Conversation history
 
 The signed-in user's Conversations are stored in Postgres so their history is durable across a reload and visible on another device for the same user.
-Storage sits behind the `rag.store` seam: `PostgresConversationStore` implements the same interface as the offline `InMemoryConversationStore`, so nothing above it (the shell, the accounts seam, the answer seam) changes.
+Storage sits behind the `rag.domain.conversations` seam: `PostgresConversationStore` implements the same interface as the offline `InMemoryConversationStore`, so nothing above it (the shell, the accounts seam, the answer seam) changes.
 
 ## Connection settings
 
@@ -28,7 +28,7 @@ That matches the placeholder `DATABASE_URL` above.
 Build the store from the connection string; it creates its tables on first use:
 
 ```python
-from rag.store import PostgresConversationStore
+from rag.infrastructure.persistence import PostgresConversationStore
 
 store = PostgresConversationStore.from_dsn(os.environ["DATABASE_URL"])
 ```

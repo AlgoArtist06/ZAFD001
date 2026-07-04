@@ -5,7 +5,6 @@
       "id": "bns-303-theft-en",
       "query": "What is the punishment for theft of movable property?",
       "language": "en",
-      "mode": "citizen",
       "expected_act_id": "bns",
       "expected_section": "303"
     },
@@ -13,7 +12,6 @@
       "id": "bns-318-cheating-en",
       "query": "Someone cheated me by fraud and took my property dishonestly",
       "language": "en",
-      "mode": "citizen",
       "expected_act_id": "bns",
       "expected_section": "318"
     },
@@ -21,7 +19,6 @@
       "id": "cpa-35-complaint-en",
       "query": "How do I file a consumer complaint about goods sold to me?",
       "language": "en",
-      "mode": "citizen",
       "expected_act_id": "cpa",
       "expected_section": "35"
     },
@@ -29,7 +26,6 @@
       "id": "constitution-21-liberty-en",
       "query": "What protects my life and personal liberty?",
       "language": "en",
-      "mode": "citizen",
       "expected_act_id": "constitution",
       "expected_section": "21"
     },
@@ -37,7 +33,6 @@
       "id": "copyright-51-infringed-en",
       "query": "Someone copied my work without a licence, is my copyright infringed?",
       "language": "en",
-      "mode": "citizen",
       "expected_act_id": "copyright",
       "expected_section": "51"
     },
@@ -45,66 +40,30 @@
       "id": "refusal-out-of-scope-en",
       "query": "What is the best recipe for biryani?",
       "language": "en",
-      "mode": "citizen",
       "expect_refusal": true
     },
     {
       "id": "refusal-advice-outcome-en",
       "query": "Someone took my movable property by theft - will I win if I sue?",
       "language": "en",
-      "mode": "citizen",
       "expect_refusal": true
     },
     {
       "id": "refusal-advice-action-en",
       "query": "My goods were defective - what should I do about the seller?",
       "language": "en",
-      "mode": "citizen",
       "expect_refusal": true
     },
     {
       "id": "high-stakes-arrest-en",
       "query": "The police are arresting me - what is the punishment for theft?",
       "language": "en",
-      "mode": "citizen",
       "expect_high_stakes": true
-    },
-    {
-      "id": "bns-303-theft-pro-en",
-      "query": "theft of movable property out of possession",
-      "language": "en",
-      "mode": "professional",
-      "expected_act_id": "bns",
-      "expected_section": "303"
-    },
-    {
-      "id": "bns-318-cheating-pro-en",
-      "query": "cheating by deceiving fraudulently dishonestly to deliver property",
-      "language": "en",
-      "mode": "professional",
-      "expected_act_id": "bns",
-      "expected_section": "318"
-    },
-    {
-      "id": "cpa-35-complaint-pro-en",
-      "query": "complaint filed with District Commission by consumer for goods sold",
-      "language": "en",
-      "mode": "professional",
-      "expected_act_id": "cpa",
-      "expected_section": "35"
-    },
-    {
-      "id": "refusal-out-of-scope-pro-en",
-      "query": "best recipe for biryani",
-      "language": "en",
-      "mode": "professional",
-      "expect_refusal": true
     },
     {
       "id": "ipc-420-to-bns-318-en",
       "query": "What is the punishment under IPC 420?",
       "language": "en",
-      "mode": "citizen",
       "expected_act_id": "bns",
       "expected_section": "318"
     },
@@ -116,7 +75,6 @@
       ],
       "query": "What is the punishment for it?",
       "language": "en",
-      "mode": "citizen",
       "expected_act_id": "bns",
       "expected_section": "318"
     },
@@ -124,7 +82,6 @@
       "id": "bns-303-theft-hi",
       "query": "चोरी की सजा क्या है?",
       "language": "hi",
-      "mode": "citizen",
       "expected_act_id": "bns",
       "expected_section": "303"
     },
@@ -132,7 +89,6 @@
       "id": "bns-318-cheating-hi",
       "query": "किसी ने मुझे धोखाधड़ी से ठगा और मेरी संपत्ति बेईमानी से ले ली",
       "language": "hi",
-      "mode": "citizen",
       "expected_act_id": "bns",
       "expected_section": "318"
     },
@@ -140,7 +96,6 @@
       "id": "cpa-35-complaint-hi",
       "query": "मुझे बेचे गए सामान के बारे में उपभोक्ता शिकायत कैसे दर्ज करूँ?",
       "language": "hi",
-      "mode": "citizen",
       "expected_act_id": "cpa",
       "expected_section": "35"
     },
@@ -148,7 +103,6 @@
       "id": "constitution-21-liberty-hi",
       "query": "मेरे जीवन और व्यक्तिगत स्वतंत्रता की रक्षा क्या करता है?",
       "language": "hi",
-      "mode": "citizen",
       "expected_act_id": "constitution",
       "expected_section": "21"
     },
@@ -156,7 +110,6 @@
       "id": "copyright-51-infringed-hi",
       "query": "किसी ने बिना लाइसेंस मेरा काम कॉपी किया, क्या मेरा कॉपीराइट उल्लंघन हुआ?",
       "language": "hi",
-      "mode": "citizen",
       "expected_act_id": "copyright",
       "expected_section": "51"
     },
@@ -164,21 +117,18 @@
       "id": "refusal-out-of-scope-hi",
       "query": "बिरयानी की सबसे अच्छी रेसिपी क्या है?",
       "language": "hi",
-      "mode": "citizen",
       "expect_refusal": true
     },
     {
       "id": "confirmation-ambiguous-rights-hi",
       "query": "मेरे अधिकार क्या हैं?",
       "language": "hi",
-      "mode": "citizen",
       "expect_confirmation": true
     },
     {
       "id": "bns-303-theft-ta",
       "query": "திருட்டுக்கான தண்டனை என்ன?",
       "language": "ta",
-      "mode": "citizen",
       "expected_act_id": "bns",
       "expected_section": "303"
     },
@@ -186,7 +136,6 @@
       "id": "bns-318-cheating-ta",
       "query": "யாரோ ஏமாற்றுதல் மூலம் என்னை ஏமாற்றி என் சொத்து நேர்மையற்ற முறையில் எடுத்தார்",
       "language": "ta",
-      "mode": "citizen",
       "expected_act_id": "bns",
       "expected_section": "318"
     },
@@ -194,7 +143,6 @@
       "id": "cpa-35-complaint-ta",
       "query": "எனக்கு விற்கப்பட்ட பொருட்கள் குறித்து நுகர்வோர் புகார் எப்படி பதிவு செய்வது?",
       "language": "ta",
-      "mode": "citizen",
       "expected_act_id": "cpa",
       "expected_section": "35"
     },
@@ -202,7 +150,6 @@
       "id": "constitution-21-liberty-ta",
       "query": "என் உயிர் மற்றும் தனிப்பட்ட சுதந்திரம் எதனால் பாதுகாக்கப்படுகிறது?",
       "language": "ta",
-      "mode": "citizen",
       "expected_act_id": "constitution",
       "expected_section": "21"
     },
@@ -210,37 +157,25 @@
       "id": "copyright-51-infringed-ta",
       "query": "யாரோ உரிமம் இல்லாமல் என் படைப்பை நகலெடுத்தார், என் பதிப்புரிமை மீறல் ஆனதா?",
       "language": "ta",
-      "mode": "citizen",
       "expected_act_id": "copyright",
       "expected_section": "51"
-    },
-    {
-      "id": "bns-303-theft-pro-ta",
-      "query": "திருட்டு அசையும் சொத்து உடைமையில் இருந்து",
-      "language": "ta",
-      "mode": "professional",
-      "expected_act_id": "bns",
-      "expected_section": "303"
     },
     {
       "id": "refusal-out-of-scope-ta",
       "query": "சிறந்த பிரியாணி செய்முறை என்ன?",
       "language": "ta",
-      "mode": "citizen",
       "expect_refusal": true
     },
     {
       "id": "confirmation-ambiguous-rights-ta",
       "query": "என் உரிமைகள் என்ன?",
       "language": "ta",
-      "mode": "citizen",
       "expect_confirmation": true
     },
     {
       "id": "bns-303-theft-gu",
       "query": "ચોરી માટે સજા શું છે?",
       "language": "gu",
-      "mode": "citizen",
       "expected_act_id": "bns",
       "expected_section": "303"
     },
@@ -248,7 +183,6 @@
       "id": "bns-318-cheating-gu",
       "query": "કોઈએ છેતરપિંડી કરીને મને છેતર્યો અને મારી મિલકત અપ્રામાણિકપણે લઈ લીધી",
       "language": "gu",
-      "mode": "citizen",
       "expected_act_id": "bns",
       "expected_section": "318"
     },
@@ -256,7 +190,6 @@
       "id": "cpa-35-complaint-gu",
       "query": "મને વેચાયેલા માલ વિશે ગ્રાહક ફરિયાદ કેવી રીતે નોંધાવું?",
       "language": "gu",
-      "mode": "citizen",
       "expected_act_id": "cpa",
       "expected_section": "35"
     },
@@ -264,7 +197,6 @@
       "id": "constitution-21-liberty-gu",
       "query": "મારા જીવન અને વ્યક્તિગત સ્વતંત્રતાનું રક્ષણ શું કરે છે?",
       "language": "gu",
-      "mode": "citizen",
       "expected_act_id": "constitution",
       "expected_section": "21"
     },
@@ -272,31 +204,55 @@
       "id": "copyright-51-infringed-gu",
       "query": "કોઈએ લાઇસન્સ વિના મારી કૃતિ નકલ કરી, શું મારો કૉપીરાઇટ ઉલ્લંઘન થયો?",
       "language": "gu",
-      "mode": "citizen",
       "expected_act_id": "copyright",
       "expected_section": "51"
-    },
-    {
-      "id": "bns-303-theft-pro-gu",
-      "query": "ચોરી જંગમ મિલકત કબજામાંથી",
-      "language": "gu",
-      "mode": "professional",
-      "expected_act_id": "bns",
-      "expected_section": "303"
     },
     {
       "id": "refusal-out-of-scope-gu",
       "query": "શ્રેષ્ઠ બિરયાની રેસીપી શું છે?",
       "language": "gu",
-      "mode": "citizen",
       "expect_refusal": true
     },
     {
       "id": "confirmation-ambiguous-rights-gu",
       "query": "મારા અધિકારો શું છે?",
       "language": "gu",
-      "mode": "citizen",
       "expect_confirmation": true
+    },
+    {
+      "id": "it_act-66C-identity-en",
+      "query": "What is the punishment for identity theft using someone else password or unique identification?",
+      "language": "en",
+      "expected_act_id": "it_act",
+      "expected_section": "66C"
+    },
+    {
+      "id": "mv_act-185-drunk-en",
+      "query": "What is the penalty for driving a motor vehicle while drunk with alcohol in blood?",
+      "language": "en",
+      "expected_act_id": "mv_act",
+      "expected_section": "185"
+    },
+    {
+      "id": "rti_act-6-request-en",
+      "query": "How do I make a request in writing to obtain information from a public information officer?",
+      "language": "en",
+      "expected_act_id": "rti_act",
+      "expected_section": "6"
+    },
+    {
+      "id": "dv_act-18-protection-en",
+      "query": "Can a magistrate pass a protection order to prohibit the respondent from domestic violence?",
+      "language": "en",
+      "expected_act_id": "dv_act",
+      "expected_section": "18"
+    },
+    {
+      "id": "posh_act-9-complaint-en",
+      "query": "How do I make a complaint of sexual harassment at workplace to the internal committee?",
+      "language": "en",
+      "expected_act_id": "posh_act",
+      "expected_section": "9"
     }
   ]
 }

@@ -3,13 +3,13 @@
 These tests exercise the public ``answer(query, mode, language)`` entry through a
 ``LegalAssistant`` built over the tiny offline corpus from ``conftest``.
 """
-from rag.answer import REFUSAL_TEXT, LegalAssistant, answer
+from rag.domain.answer import REFUSAL_TEXT, answer
+from tests.doubles import offline_assistant
 
 
 def test_supported_english_citizen_query_returns_grounded_answer(corpus):
-    result = LegalAssistant(corpus).answer(
+    result = offline_assistant(corpus).answer(
         "What is the punishment for theft of movable property?",
-        mode="citizen",
         language="en",
     )
     assert result.refused is False
@@ -18,15 +18,15 @@ def test_supported_english_citizen_query_returns_grounded_answer(corpus):
 
 
 def test_module_level_answer_entry_matches_the_method(corpus):
-    assistant = LegalAssistant(corpus)
-    result = answer("theft of property", "citizen", "en", assistant=assistant)
+    assistant = offline_assistant(corpus)
+    result = answer("theft of property", "en", assistant=assistant)
     assert result.refused is False
     assert result.citations
 
 
 def test_unsupported_query_is_refused_not_guessed(corpus):
-    result = LegalAssistant(corpus).answer(
-        "What is the best recipe for biryani?", "citizen", "en"
+    result = offline_assistant(corpus).answer(
+        "What is the best recipe for biryani?", "en"
     )
     assert result.refused is True
     assert result.citations == []
@@ -34,7 +34,7 @@ def test_unsupported_query_is_refused_not_guessed(corpus):
 
 
 def test_every_citation_is_backed_by_a_provenance_record(corpus):
-    result = LegalAssistant(corpus).answer("theft of property", "citizen", "en")
+    result = offline_assistant(corpus).answer("theft of property", "en")
     assert result.citations
     for citation in result.citations:
         assert citation.act_name
@@ -45,7 +45,7 @@ def test_every_citation_is_backed_by_a_provenance_record(corpus):
 
 
 def test_citation_anchor_is_shown_verbatim_in_english(corpus):
-    result = LegalAssistant(corpus).answer("theft of property", "citizen", "en")
+    result = offline_assistant(corpus).answer("theft of property", "en")
     citation = result.citations[0]
     # The Citation Anchor quotes the Verbatim Text of the section, in English.
     assert "intending to take dishonestly any movable property" in citation.verbatim_text
@@ -54,8 +54,8 @@ def test_citation_anchor_is_shown_verbatim_in_english(corpus):
 
 def test_old_ipc_number_is_normalised_and_grounded_in_current_bns(corpus):
     # A user who only knows the repealed IPC number still gets the BNS answer.
-    result = LegalAssistant(corpus).answer(
-        "What is the punishment under IPC 420?", "citizen", "en"
+    result = offline_assistant(corpus).answer(
+        "What is the punishment under IPC 420?", "en"
     )
     assert result.refused is False
     # Grounded in the current BNS section (318), not the repealed IPC number.
@@ -63,8 +63,8 @@ def test_old_ipc_number_is_normalised_and_grounded_in_current_bns(corpus):
 
 
 def test_old_ipc_number_is_annotated_but_never_cited_as_a_source(corpus):
-    result = LegalAssistant(corpus).answer(
-        "What is the punishment under IPC 420?", "citizen", "en"
+    result = offline_assistant(corpus).answer(
+        "What is the punishment under IPC 420?", "en"
     )
     # The former IPC number is annotated as a courtesy...
     assert "formerly IPC 420" in result.text
@@ -74,12 +74,12 @@ def test_old_ipc_number_is_annotated_but_never_cited_as_a_source(corpus):
 
 
 def test_query_without_an_ipc_reference_carries_no_annotation(corpus):
-    result = LegalAssistant(corpus).answer("theft of property", "citizen", "en")
+    result = offline_assistant(corpus).answer("theft of property", "en")
     assert "formerly IPC" not in result.text
 
 
 def test_answer_uses_the_structured_format(corpus):
-    result = LegalAssistant(corpus).answer("theft of property", "citizen", "en")
+    result = offline_assistant(corpus).answer("theft of property", "en")
     text = result.text
     # plain-language explanation, then legal basis with Citation, then next step.
     assert "In plain language" in result.explanation

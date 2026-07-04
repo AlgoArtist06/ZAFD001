@@ -19,6 +19,42 @@
       "scheme_url": "https://pmjay.gov.in",
       "source_hash": "scheme-pmjay-000000000000000000000000000000000000000000000000000",
       "facts": "Eligibility: families identified in the SECC database. Benefit: health cover up to Rs 5 lakh per family per year. How to apply: verify eligibility at pmjay.gov.in or a listed hospital."
+    },
+    {
+      "id": "pmkisan",
+      "name": "Pradhan Mantri Kisan Samman Nidhi",
+      "year": 2019,
+      "governing_authority": "Ministry of Agriculture and Farmers Welfare",
+      "scheme_url": "https://pmkisan.gov.in",
+      "facts": "Eligibility: all landholding farmer families, subject to exclusion criteria. Benefit: income support of 6000 rupees per year in three equal instalments. Documents: Aadhaar, land records, bank account. How to apply: online at pmkisan.gov.in or at a Common Service Centre or the local revenue officer.",
+      "source_hash": "scheme-pmkisan-d88f117485fa36f5c7be9d381f09693319f2020921da374d8"
+    },
+    {
+      "id": "nsap",
+      "name": "National Social Assistance Programme",
+      "year": 1995,
+      "governing_authority": "Ministry of Rural Development",
+      "scheme_url": "https://nsap.nic.in",
+      "facts": "Eligibility: destitute elderly persons, widows, and persons with severe disability from below-poverty-line households. Benefit: monthly pension under the old age, widow, and disability pension schemes. Documents: Aadhaar, age or disability proof, BPL card, bank account. How to apply: at the Gram Panchayat or municipality or online at nsap.nic.in.",
+      "source_hash": "scheme-nsap-753dcfa31e324def00ec1c2a3b516ce3ccb70c5b2b14c1130529"
+    },
+    {
+      "id": "sukanya",
+      "name": "Sukanya Samriddhi Yojana",
+      "year": 2015,
+      "governing_authority": "Ministry of Finance",
+      "scheme_url": "https://www.nsiindia.gov.in",
+      "facts": "Eligibility: a girl child below ten years of age; the account is opened by a parent or guardian. Benefit: a small savings account with a high fixed interest rate and tax benefits, maturing when the girl turns 21. Documents: birth certificate of the girl child, identity and address proof of the guardian. How to apply: at any post office or authorised bank branch.",
+      "source_hash": "scheme-sukanya-d47eaf5fd5ed0f6751ad49a48ca8b62ff47cdceeb38f6d89e"
+    },
+    {
+      "id": "pmjjby",
+      "name": "Pradhan Mantri Jeevan Jyoti Bima Yojana",
+      "year": 2015,
+      "governing_authority": "Ministry of Finance",
+      "scheme_url": "https://www.jansuraksha.gov.in",
+      "facts": "Eligibility: bank or post office account holders aged 18 to 50 years who give consent for auto-debit. Benefit: a one-year renewable life insurance cover of 2 lakh rupees for death due to any reason, for a low annual premium. Documents: Aadhaar linked to the bank account. How to apply: through the account-holding bank or post office, or online at jansuraksha.gov.in.",
+      "source_hash": "scheme-pmjjby-85ce285746a9bb24e44eb32a19d039e8156040d29612e96816"
     }
   ]
 }
