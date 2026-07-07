@@ -242,6 +242,10 @@ async function main(): Promise<void> {
     console.log(
       `embedded + stored ${Math.min(start + EMBED_BATCH, toEmbed.length)}/${toEmbed.length}`,
     );
+    // Pace requests to stay within the provider's per-minute quota.
+    if (start + EMBED_BATCH < toEmbed.length) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
   }
 
   // 7. Delete chunks that disappeared from the sources (never the corpus).

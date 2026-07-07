@@ -55,6 +55,7 @@ export async function embedTexts(
   config: EmbeddingConfig,
 ): Promise<number[][]> {
   const url = `${config.baseUrl.replace(/\/+$/, "")}/embeddings`;
+  const MAX_RETRIES = 5;
   for (let attempt = 1; ; attempt++) {
     let response: Response;
     try {
@@ -71,22 +72,47 @@ export async function embedTexts(
         }),
       });
     } catch (error) {
-      if (attempt === 2) throw error;
+      if (attempt >= MAX_RETRIES) throw error;
       continue;
     }
-    if (response.status >= 500 && attempt === 1) continue;
+    if (response.status >= 500 && attempt < MAX_RETRIES) continue;
     if (!response.ok) {
+      const detail = await response.text();
+      if (response.status === 429) {
+        // Prefer server-specified delay; fall back to exponential backoff.
+        const retry = detail.match(/retryDelay"\s*:\s*"([\d.]+)s"/i);
+        const seconds = retry
+          ? Number(retry[1]) + 1
+          : Math.min(30 * Math.pow(2, attempt - 1), 480);
+        if (attempt < MAX_RETRIES) {
+          console.log(
+            `429 rate-limited (attempt ${attempt}/${MAX_RETRIES}), ` +
+              `waiting ${seconds}s before retry…`,
+          );
+          await new Promise((resolve) =>
+            setTimeout(resolve, seconds * 1000),
+          );
+          continue;
+        }
+      }
       throw new Error(
-        `embedding request failed: ${response.status} ${await response.text()}`,
+        `embedding request failed: ${response.status} ${detail}`,
       );
     }
     const body = (await response.json()) as {
-      data: Array<{ index: number; embedding: number[] }>;
+      data: Array<{ index?: number; embedding: number[] }>;
     };
     // The API may reorder; index restores input order.
     const vectors = new Array<number[]>(texts.length);
-    for (const item of body.data) {
-      vectors[item.index] = normalise(item.embedding);
+    for (const [position, item] of body.data.entries()) {
+      vectors[item.index ?? position] = normalise(item.embedding);
+    }
+    if (
+      vectors.some(
+        (vector) => vector === undefined || vector.length !== config.dimensions,
+      )
+    ) {
+      throw new Error("embedding response was incomplete or had wrong dimensions");
     }
     return vectors;
   }
