@@ -15,6 +15,9 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./vitest.setup.ts"],
-    include: ["src/**/*.test.{ts,tsx}"],
+    include: ["src/**/*.test.{ts,tsx}", "tests/**/*.test.ts"],
+    // Convex function tests declare `@vitest-environment edge-runtime` per
+    // file, matching the real Convex runtime; the rest default to jsdom.
+    server: { deps: { inline: ["convex-test"] } },
   },
 });

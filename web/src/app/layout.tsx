@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 
+import { ConvexClientProvider } from "@/components/convex-client-provider";
 import { clerkAppearance } from "@/lib/clerk-theme";
 import {
   Noto_Sans,
@@ -81,7 +82,9 @@ export default function RootLayout({
             }}
           />
         </head>
-        <body className="min-h-full flex flex-col">{children}</body>
+        <body className="min-h-full flex flex-col">
+          <ConvexClientProvider>{children}</ConvexClientProvider>
+        </body>
       </html>
     </ClerkProvider>
   );

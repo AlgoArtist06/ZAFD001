@@ -11,7 +11,7 @@ import { clerkAppearance } from "@/lib/clerk-theme";
 // account and all stored data; anyone else is redirected to sign-in. Clerk's
 // session is threaded down so the deletion is attributed to that user.
 export default function SettingsPage() {
-  const { isLoaded, isSignedIn, getToken, signOut } = useAuth();
+  const { isLoaded, isSignedIn, signOut } = useAuth();
   const { user } = useUser();
   const router = useRouter();
 
@@ -24,7 +24,6 @@ export default function SettingsPage() {
       memberSince={
         user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : null
       }
-      getToken={() => getToken()}
       onSignOut={() => signOut()}
       onDeleted={() => router.replace("/")}
       profile={<UserProfile appearance={clerkAppearance} routing="hash" />}

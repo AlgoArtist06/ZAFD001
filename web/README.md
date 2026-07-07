@@ -11,55 +11,49 @@ Signed-in users ask legal questions in English, Hindi, Tamil, or Gujarati and re
 /sign-in     Clerk-hosted auth in a branded panel (public)
 /sign-up     Clerk-hosted auth in a branded panel (public)
 /chat        AuthedApp -> ConsentGate -> Shell
-                                          |  POST /api/answer  (NDJSON frames)
+                                          |  Convex mutations + reactive query
                                           v
-             FastAPI  rag.api.app (wired by rag.composition) -> rag.domain
+             Convex answer pipeline -> Convex DB + vector search
 ```
 
 Route protection happens at the edge in `src/proxy.ts` (Clerk middleware); `/`, `/sign-in`, and `/sign-up` are the only public routes.
 All state lives in two hooks: `src/hooks/use-chat.ts` (conversations, streaming, deletion) and `src/hooks/use-theme.ts` (dark mode).
 The components under `src/components/chat/` and `src/components/landing/` are presentation only.
-The NDJSON folding logic is pure and unit-tested in `src/lib/answer-stream.ts`.
+Convex stores the growing structured answer in a stream document; `useQuery`
+reactively updates the existing answer UI.
 
-## The answer stream contract
+## The answer document contract
 
-`POST /api/answer` streams NDJSON frames, one JSON object per line.
-Frames replace their field on the accumulating answer, except `citation`, which appends.
+`chat.ask` returns a stream-document id. `chat.getStream` exposes its current
+state until `done` becomes true.
 
-| Frame kind | Payload | Semantics |
+| Field | Semantics |
+|---|---|
+| `state`, `language` | Normal, emergency, refusal, or error presentation |
+| `highStakesNotice` | Emergency contacts before legal content |
+| `explanation` | Cumulative generated explanation |
+| `citations` | Verified references with verbatim statutory text |
+| `note`, `nextStep`, `disclaimer` | Recognition note, practical step, legal boundary |
+
+## Convex functions used
+
+| Type | Function | Purpose |
 |---|---|---|
-| `meta` | `state` (`normal` / `emergency` / `refusal`), `language` | Leads the stream; may repeat later as a correction (late refusal) |
-| `highStakesNotice` | `text` | Emergency contacts, always before legal content |
-| `explanation` | `text` | Cumulative: each frame carries the full text so far |
-| `citation` | `reference`, `verbatim`, `url` | One per verified Citation, appended |
-| `note` | `text` | Former-IPC recognition note |
-| `nextStep` | `text` | Practical next step |
-| `disclaimer` | `text` | The persistent legal-aid pointer |
+| Query | `privacyNotice`, `consentStatus` | Consent gate |
+| Mutation | `recordConsent` | Record consent |
+| Query | `listConversations`, `getConversationHistory` | Restore history |
+| Mutation | `createConversation`, `deleteConversation`, `ask` | Chat lifecycle |
+| Query | `getStream` | Reactive answer updates |
+| Action | `deleteAccount` | Erase Clerk and Convex data |
 
-## Backend endpoints used
-
-| Method | Path | Purpose |
-|---|---|---|
-| GET | `/api/privacy-notice` | Notice text for the consent gate |
-| GET | `/api/consent` | Whether this user already consented (skips the gate) |
-| POST | `/api/consent` | Record consent |
-| GET | `/api/conversations` | Hydrate the sidebar after a reload |
-| POST | `/api/conversations` | Create a persisted Conversation |
-| GET | `/api/conversations/{id}` | Load a Conversation's turns on selection |
-| DELETE | `/api/conversations/{id}` | Delete one Conversation |
-| POST | `/api/answer` | Ask; streams NDJSON frames |
-| DELETE | `/api/account` | Erase the account and all data |
-
-Every mutating call carries the Clerk session token as `Authorization: Bearer <token>`.
+Clerk supplies the Convex JWT; application code never handles bearer tokens.
 
 ## Run it
 
-Backend, from the repository root (see the root `.env.example` for all settings):
+Convex backend, from this `web/` directory:
 
 ```bash
-pip install -e . && pip install fastapi uvicorn "pyjwt[crypto]" httpx
-set -a; source .env; set +a
-uvicorn rag.composition:build_demo_app --factory --reload --port 8000
+npx convex dev
 ```
 
 Frontend, from this `web/` directory (Node 20.9+):
@@ -70,13 +64,12 @@ npm run dev
 ```
 
 Open http://localhost:3000.
-The frontend targets `http://localhost:8000` by default; point it elsewhere with `NEXT_PUBLIC_API_URL`.
-Clerk keys must be present in `web/.env.local` (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`) and exported to the backend so it verifies the same instance's session tokens.
+Set `NEXT_PUBLIC_CONVEX_URL` and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` in `web/.env.local`. Set `CLERK_JWT_ISSUER_DOMAIN`, `LLM_API_KEY`, and `LLM_MODEL` on the Convex deployment.
 
 ## Develop
 
 ```bash
-npm run test    # vitest + testing-library (shell, answer view, consent gate, stream folding)
+npm run test    # vitest + testing-library
 npm run lint    # eslint
 npm run build   # production build
 ```

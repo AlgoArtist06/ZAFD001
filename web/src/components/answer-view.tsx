@@ -5,12 +5,10 @@ import type {
   AnswerState,
   RefusalReason,
   StructuredAnswer,
-} from "@/lib/answer-stream";
+} from "@/lib/structured-answer";
 
-// The structured signals live in the answer-stream contract; re-exported here
-// so existing imports (and tests) keep working.
-export { emptyAnswer } from "@/lib/answer-stream";
-export type { AnswerState, Citation, StructuredAnswer } from "@/lib/answer-stream";
+export { emptyAnswer } from "@/lib/structured-answer";
+export type { AnswerState, Citation, StructuredAnswer } from "@/lib/structured-answer";
 
 // How each state tints its container, so a reader tells emergency from refusal
 // from error from a normal sourced answer at a glance. Large, readable text

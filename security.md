@@ -1,3 +1,5 @@
+> **Historical note (2026-07-07):** this review covers the retired Python/FastAPI + Postgres + Qdrant stack. The application now runs on Next.js + Convex (see README.md); findings below are kept for the record and no longer describe the live surface.
+
 # Security Review - ZAFD001 (Legal Saathi)
 
 Consolidated security and bug report for the Multilingual Legal Awareness Assistant (ZABR-008).

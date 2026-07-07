@@ -1,59 +1,57 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { getFunctionName } from "convex/server";
 
 import { Shell } from "@/components/shell";
 
-// A fetch double whose response body streams the given structured frames back as
-// NDJSON, so the shell can be exercised against the answer seam's signals
-// (explanation, citation, disclaimer, refusal, high-stakes) without a backend.
-function streamingResponse(frames: object[]) {
-  const encoder = new TextEncoder();
-  const body = new ReadableStream<Uint8Array>({
-    start(controller) {
-      for (const frame of frames) {
-        controller.enqueue(encoder.encode(JSON.stringify(frame) + "\n"));
-      }
-      controller.close();
-    },
-  });
-  return { ok: true, body } as unknown as Response;
-}
-
-// The frames a normal grounded answer streams: a plain-language explanation, a
-// verbatim-English citation, and the disclaimer with its legal-aid pointer.
-const GROUNDED_FRAMES = [
-  { kind: "meta", state: "normal" },
-  { kind: "explanation", text: "The law says X." },
-  {
-    kind: "citation",
+const GROUNDED_STREAM = {
+  _id: "stream-1",
+  done: true,
+  state: "normal",
+  explanation: "The law says X.",
+  citations: [{
     reference: "Bharatiya Nyaya Sanhita (2023), Section 303",
     verbatim: "Whoever commits theft shall be punished.",
     url: "https://example.gov.in/bns/303",
-  },
-  {
-    kind: "disclaimer",
-    text: "This is legal information, not legal advice. Consult a lawyer or your nearest Legal Services Authority (NALSA / DLSA).",
-  },
-];
+  }],
+  disclaimer: "This is legal information, not legal advice. Consult a lawyer or your nearest Legal Services Authority (NALSA / DLSA).",
+};
 
-let fetchMock: ReturnType<typeof vi.fn>;
+const createConversation = vi.fn(async () => "conv-server-1");
+const askQuestion = vi.fn(
+  async (args: { query: string; context?: string[]; conversationId?: string }) =>
+    args &&
+    "stream-1",
+);
+const deleteConversation = vi.fn(async () => undefined);
+let stream: Record<string, unknown> = GROUNDED_STREAM;
+
+vi.mock("convex/react", () => ({
+  useQuery: (query: object, args?: object | "skip") => {
+    const name = getFunctionName(query as never);
+    if (name === "chat:listConversations") return [];
+    if (name === "chat:getConversationHistory") return args === "skip" ? undefined : [];
+    if (name === "chat:getStream") return args === "skip" ? undefined : stream;
+    return undefined;
+  },
+  useMutation: (mutation: object) => {
+    const name = getFunctionName(mutation as never);
+    if (name === "chat:createConversation") return createConversation;
+    if (name === "chat:deleteConversation") return deleteConversation;
+    if (name === "chat:ask") return askQuestion;
+    return vi.fn();
+  },
+}));
 
 beforeEach(() => {
-  fetchMock = vi.fn(async (url: string, options?: RequestInit) => {
-    if (url.endsWith("/api/conversations") && options?.method === "POST") {
-      return {
-        ok: true,
-        json: async () => ({ id: "conv-server-1", mode: "citizen" }),
-      } as Response;
-    }
-    return streamingResponse(GROUNDED_FRAMES);
-  });
-  vi.stubGlobal("fetch", fetchMock);
+  stream = GROUNDED_STREAM;
+  createConversation.mockClear();
+  askQuestion.mockClear();
+  deleteConversation.mockClear();
 });
 
 afterEach(() => {
-  vi.unstubAllGlobals();
   document.documentElement.classList.remove("dark");
   window.localStorage.clear();
 });
@@ -103,16 +101,7 @@ describe("Shell", () => {
   });
 
   it("renders an out-of-scope query as a graceful refusal, never a fabricated citation", async () => {
-    fetchMock.mockResolvedValueOnce(
-      streamingResponse([
-        { kind: "meta", state: "refusal" },
-        { kind: "explanation", text: "I do not have a sourced answer for that" },
-        {
-          kind: "disclaimer",
-          text: "This is legal information, not legal advice. Consult a lawyer or your nearest Legal Services Authority (NALSA / DLSA).",
-        },
-      ]),
-    );
+    stream = { ...GROUNDED_STREAM, state: "refusal", explanation: "I do not have a sourced answer for that", citations: [] };
     render(<Shell />);
     await ask("best recipe for biryani");
 
@@ -126,22 +115,7 @@ describe("Shell", () => {
   });
 
   it("leads a high-stakes answer with emergency contacts before the legal content", async () => {
-    fetchMock.mockResolvedValueOnce(
-      streamingResponse([
-        { kind: "meta", state: "emergency" },
-        {
-          kind: "highStakesNotice",
-          text: "If you are in immediate danger, get help first:\n- Emergency: 112\n- Women's helpline: 181",
-        },
-        { kind: "explanation", text: "The law says X." },
-        {
-          kind: "citation",
-          reference: "Bharatiya Nyaya Sanhita (2023), Section 303",
-          verbatim: "Whoever commits theft shall be punished.",
-          url: "https://example.gov.in/bns/303",
-        },
-      ]),
-    );
+    stream = { ...GROUNDED_STREAM, state: "emergency", highStakesNotice: "If you are in immediate danger, get help first:\n- Emergency: 112\n- Women's helpline: 181" };
     render(<Shell />);
     await ask("I was just arrested, what are my rights?");
 
@@ -184,17 +158,7 @@ describe("Shell", () => {
   });
 
   it("deletes a Conversation through the server and removes it from the sidebar", async () => {
-    fetchMock.mockImplementation(async (url: string, options?: RequestInit) => {
-      if (url.endsWith("/api/conversations") && options?.method === "POST") {
-        return {
-          ok: true,
-          json: async () => ({ id: "conv-postgres-1", mode: "citizen" }),
-        } as Response;
-      }
-      if (options?.method === "DELETE") return { ok: true } as Response;
-      return streamingResponse(GROUNDED_FRAMES);
-    });
-    render(<Shell getToken={async () => "sess_asha"} />);
+    render(<Shell />);
     const user = await ask("Tell me about theft");
     await within(screen.getByRole("log")).findByText(/The law says X\./);
 
@@ -202,18 +166,8 @@ describe("Shell", () => {
       screen.getByRole("button", { name: /delete conversation tell me about theft/i }),
     );
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringMatching(/\/api\/conversations\/conv-postgres-1$/),
-      expect.objectContaining({
-        method: "DELETE",
-        headers: expect.objectContaining({ Authorization: "Bearer sess_asha" }),
-      }),
-    );
-    const answerBody = JSON.parse(
-      fetchMock.mock.calls.find((call) => String(call[0]).endsWith("/api/answer"))![1]
-        .body,
-    );
-    expect(answerBody.conversation_id).toBe("conv-postgres-1");
+    expect(deleteConversation).toHaveBeenCalledWith({ conversationId: "conv-server-1" });
+    expect(askQuestion).toHaveBeenCalledWith(expect.objectContaining({ conversationId: "conv-server-1" }));
     expect(
       within(screen.getByRole("complementary")).queryByText("Tell me about theft"),
     ).not.toBeInTheDocument();
@@ -222,15 +176,12 @@ describe("Shell", () => {
   it("signs out from the sidebar without touching the account", async () => {
     const signOut = vi.fn(async () => undefined);
     const user = userEvent.setup();
-    render(<Shell getToken={async () => "sess_asha"} signOut={signOut} />);
+    render(<Shell signOut={signOut} />);
 
     await user.click(screen.getByRole("button", { name: /sign out/i }));
 
     expect(signOut).toHaveBeenCalledOnce();
-    expect(fetchMock).not.toHaveBeenCalledWith(
-      expect.stringMatching(/\/api\/account$/),
-      expect.anything(),
-    );
+    expect(deleteConversation).not.toHaveBeenCalled();
   });
 
   it("sends prior turns as context so a follow-up builds on the Conversation", async () => {
@@ -241,19 +192,13 @@ describe("Shell", () => {
     await user.type(screen.getByLabelText(/your legal question/i), "What is the punishment for it?");
     await user.click(screen.getByRole("button", { name: /^ask$/i }));
 
-    const followupBody = JSON.parse(fetchMock.mock.calls[1][1].body);
-    expect(followupBody.context).toEqual(["Someone cheated me by fraud"]);
+    expect(askQuestion.mock.calls[1]?.[0]).toMatchObject({ context: ["Someone cheated me by fraud"] });
   });
 
-  it("attributes the request to the signed-in user by sending their Bearer token", async () => {
-    render(<Shell getToken={async () => "sess_asha"} />);
+  it("sends questions through the authenticated Convex mutation", async () => {
+    render(<Shell />);
     await ask("What is the punishment for theft?");
-
-    const answerCall = fetchMock.mock.calls.find((call) =>
-      String(call[0]).endsWith("/api/answer"),
-    )!;
-    const headers = answerCall[1].headers;
-    expect(headers.Authorization).toBe("Bearer sess_asha");
+    expect(askQuestion).toHaveBeenCalledWith(expect.objectContaining({ query: "What is the punishment for theft?" }));
   });
 
   it("does not carry memory across when a new Conversation is started", async () => {
@@ -265,7 +210,6 @@ describe("Shell", () => {
     await user.type(screen.getByLabelText(/your legal question/i), "What is the punishment for it?");
     await user.click(screen.getByRole("button", { name: /^ask$/i }));
 
-    const freshBody = JSON.parse(fetchMock.mock.calls.at(-1)![1].body);
-    expect(freshBody.context).toEqual([]);
+    expect(askQuestion.mock.calls.at(-1)?.[0]).toMatchObject({ context: [] });
   });
 });

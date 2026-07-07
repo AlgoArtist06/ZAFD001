@@ -3,7 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, LogOut, ShieldAlert, Trash2 } from "lucide-react";
+import { useAction } from "convex/react";
 
+import { api } from "../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -23,7 +25,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { deleteAccount } from "@/lib/account";
 
 // How the settings screen obtains the signed-in user's identity and session. The
 // authenticated page passes Clerk's values and its profile editor; the component
@@ -32,7 +33,6 @@ import { deleteAccount } from "@/lib/account";
 type AccountSettingsProps = {
   email?: string | null;
   memberSince?: string | null;
-  getToken: () => Promise<string | null>;
   onSignOut: () => Promise<void>;
   // Where to go once the account is gone: the caller navigates to a public
   // page before the session is cleared, so the erased user is not bounced back
@@ -50,20 +50,21 @@ type AccountSettingsProps = {
 export function AccountSettings({
   email,
   memberSince,
-  getToken,
   onSignOut,
   onDeleted,
   profile,
 }: AccountSettingsProps) {
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const deleteAccount = useAction(api.chat.deleteAccount);
 
   async function confirmDelete() {
     setError(null);
     setDeleting(true);
-    const outcome = await deleteAccount(getToken);
-    if (!outcome.ok) {
-      setError(outcome.message);
+    try {
+      await deleteAccount({});
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
       setDeleting(false);
       return;
     }

@@ -5,100 +5,97 @@ Every answer is grounded in retrieved bare-act text and cites the exact statute 
 
 The system is legal *information*, never legal *advice*: advice-seeking questions are refused and redirected to real help (a lawyer or the nearest Legal Services Authority, NALSA / DLSA).
 
+## Architecture
+
+```
+Next.js (web/)
+   |
+Convex functions (web/convex/)
+   |
+Convex DB + Convex vector search  +  OpenAI-compatible LLM & embedding APIs
+```
+
 ## What is in this repo
 
 | Path | What it is |
 |---|---|
-| `ingestion/` | Phase 0 pipeline that parses the bare-act sources in `data/` into provenance-tracked chunks and loads them into the vector store. |
-| `rag/domain/` | The answer seam: routing, hybrid retrieval, grounded generation, citation verification, guardrails, and multilingual normalisation. |
-| `rag/services/` | Application services over the domain: the chat shell, streaming, and the gold-eval harness. |
-| `rag/infrastructure/` | Live adapters: the LLM client, Clerk auth, Postgres persistence, Qdrant consistency. |
-| `rag/api/app.py` | The FastAPI HTTP surface (routes only). |
-| `rag/composition.py` | The composition root: the one place adapters are selected and wired. |
 | `web/` | The Next.js frontend (see `web/README.md`). |
-| `data/` | The Source of Truth: bare-act text, schemes, glossary, IPC-to-BNS mapping, and the gold eval set. |
+| `web/convex/` | The Convex backend: schema, chat/consent persistence, the grounded answer pipeline (`llm.ts`), hybrid retrieval (`retrieval.ts`), guardrails, citation verification, and the corpus storage seam. |
+| `web/convex/lib/` | The ported legal domain logic: routing, hybrid scoring, expansion, multilingual glossary, IPC-to-BNS recognition, follow-up memory, the answer seam. |
+| `web/scripts/` | Operator scripts: `ingestLegalCorpus.ts` (parse -> chunk -> validate -> embed changed chunks -> store) and `runGoldEval.ts` (the live gold evaluation). |
+| `web/tests/` | The test suite: domain behavior, gold eval (all four languages), Convex function tests, and the end-to-end pipeline under convex-test. |
+| `data/` | The Source of Truth: bare-act text, schemes, glossary, IPC-to-BNS mapping, ground truth, and the gold eval set. |
 
 Design docs live in `CONTEXT.md` (the domain's ubiquitous language) and `docs/adr/`.
 
 ## Prerequisites
 
-- Python 3.10+ and a virtualenv.
-- Node 20.9+ (for the frontend).
-- Docker (for local Qdrant + Postgres via `docker-compose.yml`).
-- An OpenAI-compatible LLM API key. The default is Google Gemini 2.5 Flash (free key at https://aistudio.google.com/apikey); any compatible provider works by changing `LLM_BASE_URL` and `LLM_MODEL`.
+- Node 20.9+.
+- A Convex project (free at https://convex.dev; `npx convex dev` provisions one).
+- A Clerk instance (https://dashboard.clerk.com) with a **Convex** JWT template.
+- An OpenAI-compatible LLM API key. The default is Google Gemini (free key at https://aistudio.google.com/apikey); any compatible provider works by changing `LLM_BASE_URL` / `LLM_MODEL`. The same provider serves embeddings (`gemini-embedding-001`, 768 dimensions).
 
-Answering is **live-only** by design (ADR 0010): the backend refuses to start without `LLM_API_KEY`, and there is no offline template fallback.
-Embeddings, by contrast, are local FastEmbed (CPU, keyless).
-
-## Configure
-
-```bash
-cp .env.example .env
-# then fill in LLM_API_KEY at minimum; see the comments in .env.example for the rest
-```
-
-`.env` is git-ignored and must never be committed. The backend, ingestion, and (via `web/.env.local`) the frontend all read from it.
-
-Minimum to answer questions locally: `LLM_API_KEY`.
-Add `QDRANT_URL` + `QDRANT_API_KEY` to use a persistent vector store instead of re-embedding on every boot.
-Add Clerk keys (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`) and `DATABASE_URL` + `CONVERSATION_ENCRYPTION_KEY` for the full signed-in, persisted web experience.
+Answering is **live-only** by design (ADR 0010): without `LLM_API_KEY` on the Convex deployment every question returns a clear service-configuration error - there is no offline template fallback, ever.
 
 ## Run it
 
-### 1. Install
-
-```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -e . && pip install -r requirements.txt
-```
-
-### 2. (Optional) start the datastores
-
-```bash
-docker compose up -d          # Qdrant on :6333, Postgres on :5432
-```
-
-### 3. Ingest the corpus into the vector store
-
-Only needed when `QDRANT_URL` is set (with the in-memory store the backend embeds the corpus itself on boot).
-
-```bash
-python -m ingestion                 # full run
-python -m ingestion --changed-only  # re-load only acts whose source changed
-```
-
-### 4. Start the backend
-
-```bash
-uvicorn rag.composition:build_demo_app --factory --reload --port 8000
-```
-
-Health check: `curl http://localhost:8000/healthz` -> `{"status":"ok"}`.
-Answering (`POST /api/answer`) requires a signed-in, consented user, so it returns `401` without a session token - that is expected; use the frontend for the full flow.
-
-### 5. Start the frontend
+### 1. Install and provision
 
 ```bash
 cd web
 npm install
+npx convex dev          # logs in, provisions a dev deployment, writes .env.local
+```
+
+### 2. Configure the deployment
+
+```bash
+npx convex env set CLERK_JWT_ISSUER_DOMAIN https://<instance>.clerk.accounts.dev
+npx convex env set CLERK_SECRET_KEY sk_...
+npx convex env set LLM_API_KEY ...
+npx convex env set LLM_MODEL gemini-2.5-flash
+npx convex env set INGEST_KEY  "$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+npx convex env set EVAL_KEY    "$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+```
+
+Put the Clerk publishable/secret keys and the same `INGEST_KEY`/`EVAL_KEY`/`LLM_API_KEY` in `web/.env.local` (see `.env.example`).
+
+### 3. Ingest the corpus
+
+```bash
+npm run ingest:legal              # parse, validate, embed CHANGED chunks, store
+npm run ingest:legal -- --dry-run # report what would change, write nothing
+```
+
+Embeddings are an ingestion-time artifact: re-running against an unchanged corpus makes zero embedding API calls, and the app can restart forever without ever re-embedding the corpus.
+Only a changed source file, changed chunking, or a changed embedding model re-embeds - and only the affected chunks.
+
+### 4. Start the frontend
+
+```bash
 npm run dev
 ```
 
-Open http://localhost:3000. The frontend targets `http://localhost:8000` by default (override with `NEXT_PUBLIC_API_URL`).
-Clerk keys must be in `web/.env.local` and exported to the backend so both verify the same instance's session tokens.
+Open http://localhost:3000. The frontend needs only `NEXT_PUBLIC_CONVEX_URL` and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`.
 
 ## Test
 
 ```bash
-# Backend (offline: injects deterministic doubles, no services or keys needed)
-python -m pytest -q
-
-# Frontend
-cd web && npm run test && npm run lint
+cd web
+npm run test    # domain suite, gold eval (offline doubles), pipeline e2e
+npm run lint
 ```
 
-`tests/test_pipeline.py` uses the real FastEmbed embedder (slower, downloads the model on first run); the rest of the suite runs fully offline.
-The live seams (`tests/test_live_*.py`) require real credentials and are skipped without them.
+The offline suite injects deterministic doubles for the live seams (embedder, generator, intent extractor), mirroring the original Python test equipment - no services or keys needed.
+
+The **live** gold evaluation runs the same 37 hand-verified cases through the real deployed pipeline (live LLM, live embeddings, the stored corpus) and requires the bar of total correctness per language:
+
+```bash
+npm run eval:gold                    # all four languages
+npm run eval:gold -- --language en
+```
+
+Run it after any change to models, prompts, chunking, or retrieval.
 
 ## Answering behavior
 
@@ -106,3 +103,4 @@ The live seams (`tests/test_live_*.py`) require real credentials and are skipped
 - Ambiguous questions get a clarifying Confirmation Step before an answer.
 - Old IPC section numbers are recognised and mapped to the current BNS section, with the former number kept for recognition only.
 - High-stakes situations lead with emergency contacts before any legal content.
+- Every citation is verified against the retrieved statutory text; an answer whose citations cannot be verified becomes a refusal, never a repaired guess.

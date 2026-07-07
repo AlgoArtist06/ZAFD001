@@ -6,23 +6,19 @@ import { Thread } from "@/components/chat/thread";
 import { useChat } from "@/hooks/use-chat";
 import { useTheme } from "@/hooks/use-theme";
 
-// How the shell obtains the signed-in user's session token. The authenticated
-// app passes Clerk's `getToken`; without a session it resolves to null, so the
-// component stays renderable in isolation.
-type ShellProps = {
-  getToken?: () => Promise<string | null>;
-  signOut?: () => Promise<void>;
-};
+// Signing out is the only thing the shell needs from Clerk; everything else
+// (identity, persistence, answering) flows through the Convex hooks, which
+// carry the Clerk session themselves.
+type ShellProps = { signOut?: () => Promise<void> };
 
 // The authenticated chat screen: the Conversation sidebar, the thread, and the
 // composer, composed over the chat and theme hooks. All state lives in the
 // hooks; the components under chat/ are presentation only.
 export function Shell({
-  getToken = async () => null,
   signOut = async () => undefined,
 }: ShellProps) {
   const { dark, toggle } = useTheme();
-  const chat = useChat({ getToken });
+  const chat = useChat();
 
   return (
     <div className="flex min-h-screen w-full flex-col md:flex-row">

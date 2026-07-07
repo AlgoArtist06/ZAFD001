@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ShieldCheck } from "lucide-react";
+import { useMutation, useQuery } from "convex/react";
 
+import { api } from "../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,72 +14,33 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { apiUrl } from "@/lib/api";
 
 // How the gate obtains the signed-in user's session token, so the consent it
 // records server-side is attributed to that user.
-type ConsentGateProps = {
-  getToken: () => Promise<string | null>;
-  children: React.ReactNode;
-};
+type ConsentGateProps = { children: React.ReactNode };
 
 // Consent is required before a signed-in user reaches the chat shell: they are
 // shown the privacy notice - including the disclosure that queries are sent to a
 // third-party LLM - and must explicitly opt in. Accepting records consent
 // server-side at the moment it is given. A returning user who already consented
 // is recognised server-side and skips the gate entirely.
-export function ConsentGate({ getToken, children }: ConsentGateProps) {
-  const [notice, setNotice] = useState<string | null>(null);
+export function ConsentGate({ children }: ConsentGateProps) {
+  const notice = useQuery(api.chat.privacyNotice);
+  const status = useQuery(api.chat.consentStatus);
+  const recordConsent = useMutation(api.chat.recordConsent);
   const [accepted, setAccepted] = useState(false);
-  // null = still checking server-side status; the gate renders nothing yet so
-  // a consented user never sees the form flash.
-  const [consented, setConsented] = useState<boolean | null>(null);
+  const [justConsented, setJustConsented] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    let active = true;
-    void fetch(apiUrl("/api/privacy-notice"))
-      .then((response) => response.json())
-      .then((data) => {
-        if (active) setNotice(data.notice);
-      })
-      .catch(() => {
-        if (active) setNotice("Privacy notice is unavailable right now.");
-      });
-    void (async () => {
-      try {
-        const token = await getToken();
-        const headers: Record<string, string> = {};
-        if (token) headers.Authorization = `Bearer ${token}`;
-        const response = await fetch(apiUrl("/api/consent"), { headers });
-        const status = response.ok ? await response.json() : null;
-        if (active) setConsented(status?.consented === true);
-      } catch {
-        if (active) setConsented(false);
-      }
-    })();
-    return () => {
-      active = false;
-    };
-    // getToken is stable for the session; the check runs once on mount.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  if (consented) return <>{children}</>;
-  if (consented === null) return null;
+  if (status?.consented || justConsented) return <>{children}</>;
+  if (status === undefined) return null;
 
   async function agree() {
     if (!accepted || submitting) return;
     setSubmitting(true);
     try {
-      const token = await getToken();
-      const headers: Record<string, string> = {};
-      if (token) headers.Authorization = `Bearer ${token}`;
-      const response = await fetch(apiUrl("/api/consent"), {
-        method: "POST",
-        headers,
-      });
-      if (response.ok) setConsented(true);
+      await recordConsent({});
+      setJustConsented(true);
     } finally {
       setSubmitting(false);
     }
@@ -103,7 +66,7 @@ export function ConsentGate({ getToken, children }: ConsentGateProps) {
             aria-label="Privacy notice"
             className="bg-muted/50 max-h-[45vh] overflow-y-auto rounded-lg border p-4 text-sm leading-7 whitespace-pre-wrap"
           >
-            {notice ?? "Loading the privacy notice…"}
+            {notice?.notice ?? "Loading the privacy notice…"}
           </section>
           <label className="flex items-start gap-3 text-sm">
             <input
